@@ -1,0 +1,30 @@
+From e5a12edb883fe246afdb6bf897286865b0d4eeb5 Mon Sep 17 00:00:00 2001
+From: Jesus Fernandez Manzano <jesus.manzano@galgus.ai>
+Date: Mon, 22 Jan 2024 13:52:18 +0100
+Subject: [PATCH] hostapd: fix 11r defaults when using SAE
+
+When using WPA3-SAE or WPA2/WPA3 Personal Mixed, we can not use
+ft_psk_generate_local because it will break FT for SAE. Instead
+use the r0kh and r1kh configuration approach.
+
+Signed-off-by: Jesus Fernandez Manzano <jesus.manzano@galgus.ai>
+(cherry picked from commit e2f6bfb833a1ba099e1dcf0e569e4ef11c31c391)
+Fixes: https://github.com/openwrt/luci/issues/6930
+Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+---
+ package/network/services/hostapd/files/hostapd.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/network/services/hostapd/files/hostapd.sh b/package/network/services/hostapd/files/hostapd.sh
+index 5d588b3bde012..73bd1bbeeb912 100644
+--- a/package/network/services/hostapd/files/hostapd.sh
++++ b/package/network/services/hostapd/files/hostapd.sh
+@@ -909,7 +909,7 @@ hostapd_set_bss_options() {
+ 			set_default reassociation_deadline 1000
+ 
+ 			case "$auth_type" in
+-				psk|sae|psk-sae)
++				psk)
+ 					set_default ft_psk_generate_local 1
+ 				;;
+ 				*)

@@ -1,0 +1,66 @@
+From 72f7f18d2ba160f371c027ba4a60e82e19248340 Mon Sep 17 00:00:00 2001
+From: Hauke Mehrtens <hauke@hauke-m.de>
+Date: Sat, 14 Oct 2023 00:37:34 +0200
+Subject: [PATCH] mbedtls: Update to version 2.28.5
+
+This fixes some minor security problems.
+Changelog: https://github.com/Mbed-TLS/mbedtls/releases/tag/mbedtls-2.28.5
+
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+(cherry picked from commit 9e1c5ad4b0c99c45927ccd44504cd8fdbbd03bb0)
+---
+ package/libs/mbedtls/Makefile                               | 4 ++--
+ .../mbedtls/patches/100-x509-crt-verify-SAN-iPAddress.patch | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/package/libs/mbedtls/Makefile b/package/libs/mbedtls/Makefile
+index 4c3cb965c55e2..6f0b5162ebf6a 100644
+--- a/package/libs/mbedtls/Makefile
++++ b/package/libs/mbedtls/Makefile
+@@ -8,13 +8,13 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=mbedtls
+-PKG_VERSION:=2.28.4
++PKG_VERSION:=2.28.5
+ PKG_RELEASE:=1
+ PKG_BUILD_FLAGS:=no-mips16 gc-sections no-lto
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://codeload.github.com/ARMmbed/mbedtls/tar.gz/v$(PKG_VERSION)?
+-PKG_HASH:=578c4dcd15bbff3f5cd56aa07cd4f850fc733634e3d5947be4f7157d5bfd81ac
++PKG_HASH:=849e86b626e42ded6bf67197b64aa771daa54e2a7e2868dc67e1e4711959e5e3
+ 
+ PKG_LICENSE:=GPL-2.0-or-later
+ PKG_LICENSE_FILES:=gpl-2.0.txt
+diff --git a/package/libs/mbedtls/patches/100-x509-crt-verify-SAN-iPAddress.patch b/package/libs/mbedtls/patches/100-x509-crt-verify-SAN-iPAddress.patch
+index 02632cdb4ba1d..4ad2e8c7dbe4a 100644
+--- a/package/libs/mbedtls/patches/100-x509-crt-verify-SAN-iPAddress.patch
++++ b/package/libs/mbedtls/patches/100-x509-crt-verify-SAN-iPAddress.patch
+@@ -33,7 +33,7 @@ Signed-off-by: Glenn Strauss <gstrauss@gluelogic.com>
+  #include <windows.h>
+  #else
+  #include <time.h>
+-@@ -3001,6 +3005,61 @@ find_parent:
++@@ -3002,6 +3006,61 @@ find_parent:
+      }
+  }
+  
+@@ -95,7 +95,7 @@ Signed-off-by: Glenn Strauss <gstrauss@gluelogic.com>
+  /*
+   * Check for CN match
+   */
+-@@ -3021,24 +3080,51 @@ static int x509_crt_check_cn(const mbedt
++@@ -3022,24 +3081,51 @@ static int x509_crt_check_cn(const mbedt
+      return -1;
+  }
+  
+@@ -158,7 +158,7 @@ Signed-off-by: Glenn Strauss <gstrauss@gluelogic.com>
+  }
+  
+  /*
+-@@ -3049,31 +3135,23 @@ static void x509_crt_verify_name(const m
++@@ -3050,31 +3136,23 @@ static void x509_crt_verify_name(const m
+                                   uint32_t *flags)
+  {
+      const mbedtls_x509_name *name;

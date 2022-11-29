@@ -1,0 +1,30 @@
+From 2fe497c4a514d09b6e8a9e5953b51d7f4da90b6b Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Tue, 9 Jan 2024 14:36:42 +0100
+Subject: [PATCH] mac80211: do not emit VHT160 capabilities if channel width is
+ less than 160 MHz
+
+Fixes compatibility issues with VHT160 capable clients
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+(cherry picked from commit 80e4e2285fdf4a7b19c84532deafe2d1e690ed30)
+---
+ .../kernel/mac80211/files/lib/netifd/wireless/mac80211.sh    | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+index b5378e556eb23..6ff627b03813b 100644
+--- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
++++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+@@ -327,6 +327,11 @@ mac80211_hostapd_setup_base() {
+ 		[ "$rx_stbc" -lt "$cap_rx_stbc" ] && cap_rx_stbc="$rx_stbc"
+ 		vht_cap="$(( ($vht_cap & ~(0x700)) | ($cap_rx_stbc << 8) ))"
+ 
++		[ "$vht_oper_chwidth" -lt 2 ] && {
++			vht160=0
++			short_gi_160=0
++		}
++
+ 		mac80211_add_capabilities vht_capab $vht_cap \
+ 			RXLDPC:0x10::$rxldpc \
+ 			SHORT-GI-80:0x20::$short_gi_80 \

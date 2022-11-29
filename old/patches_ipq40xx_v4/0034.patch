@@ -1,0 +1,48 @@
+From 573c8c3d78cdf494156f763c7182c0f16a8d7263 Mon Sep 17 00:00:00 2001
+From: John Audia <therealgraysky@proton.me>
+Date: Wed, 8 Nov 2023 15:50:55 -0500
+Subject: [PATCH] kernel: bump 5.15 to 5.15.138
+
+Changelog: https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.138
+
+Removed upstreamed:
+	generic/backport-5.15/819-v6.6-0018-nvmem-imx-correct-nregs-for-i.MX6SLL.patch[1]
+	generic/backport-5.15/819-v6.6-0019-nvmem-imx-correct-nregs-for-i.MX6UL.patch[2]
+	generic/backport-5.15/819-v6.6-0020-nvmem-imx-correct-nregs-for-i.MX6ULL.patch[3]
+
+All other patches automatically rebased.
+
+1. https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?h=v5.15.138&id=6e22bf6f00d593b0a7e0b2f418fde89317424671
+2. https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?h=v5.15.138&id=6efd498009b987a92f57f3bdae476f0503364fb7
+3. https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?h=v5.15.138&id=6e22bf6f00d593b0a7e0b2f418fde89317424671
+
+Build system: x86_64
+Build-tested: ramips/tplink_archer-a6-v3
+Run-tested: ramips/tplink_archer-a6-v3
+
+Signed-off-by: John Audia <therealgraysky@proton.me>
+---
+ include/kernel-5.15                           |  4 +--
+ .../900-unaligned_access_hacks.patch          |  2 +-
+ ...nvmem-imx-correct-nregs-for-i.MX6SLL.patch | 28 -------------------
+ ...-nvmem-imx-correct-nregs-for-i.MX6UL.patch | 28 -------------------
+ ...nvmem-imx-correct-nregs-for-i.MX6ULL.patch | 28 -------------------
+ ...-r8152-add-LED-configuration-from-OF.patch |  8 +++---
+ .../810-pci_disable_common_quirks.patch       |  6 ++--
+ .../0001-MIPS-lantiq-add-pcie-driver.patch    |  2 +-
+ ...move-drivers-from-strlcpy-to-strscpy.patch |  2 +-
+ ...r-Gateworks-PLX-PEX860x-switch-with-.patch |  2 +-
+ 10 files changed, 13 insertions(+), 97 deletions(-)
+ delete mode 100644 target/linux/generic/backport-5.15/819-v6.6-0018-nvmem-imx-correct-nregs-for-i.MX6SLL.patch
+ delete mode 100644 target/linux/generic/backport-5.15/819-v6.6-0019-nvmem-imx-correct-nregs-for-i.MX6UL.patch
+ delete mode 100644 target/linux/generic/backport-5.15/819-v6.6-0020-nvmem-imx-correct-nregs-for-i.MX6ULL.patch
+
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 47db849241d26..6c2be5b3546a3 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .137
+-LINUX_KERNEL_HASH-5.15.137 = 9749b21609f9e7ad9c46160c2c107db823b99cef77fa6cb080b6c2dc685fb2f7
++LINUX_VERSION-5.15 = .138
++LINUX_KERNEL_HASH-5.15.138 = af84e54164e1c01f59764ba528448ed36b377d22aafbd81b4b0cf47792ef4aaa

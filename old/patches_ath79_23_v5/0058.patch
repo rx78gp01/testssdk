@@ -1,0 +1,26 @@
+From 31ae9728ffca5d4ff8bf6b56b8e7f55e4ce749eb Mon Sep 17 00:00:00 2001
+From: Eneas U de Queiroz <cotequeiroz@gmail.com>
+Date: Sat, 3 Feb 2024 16:33:14 -0300
+Subject: [PATCH] hostapd: fix FILS AKM selection with EAP-192
+
+Fix netifd hostapd.sh selection of FILS-SHA384 algorithm with eap-192.
+
+Signed-off-by: Eneas U de Queiroz <cotequeiroz@gmail.com>
+(cherry picked from commit 472312f83f886a0749672a634948726fda9c2401)
+---
+ package/network/services/hostapd/files/hostapd.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/network/services/hostapd/files/hostapd.sh b/package/network/services/hostapd/files/hostapd.sh
+index 271c1f7becd27..5d588b3bde012 100644
+--- a/package/network/services/hostapd/files/hostapd.sh
++++ b/package/network/services/hostapd/files/hostapd.sh
+@@ -77,7 +77,7 @@ hostapd_append_wpa_key_mgmt() {
+ 
+ 	[ "$fils" -gt 0 ] && {
+ 		case "$auth_type" in
+-			eap-192)
++			eap192)
+ 				append wpa_key_mgmt FILS-SHA384
+ 				[ "${ieee80211r:-0}" -gt 0 ] && append wpa_key_mgmt FT-FILS-SHA384
+ 			;;

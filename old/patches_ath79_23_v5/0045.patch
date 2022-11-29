@@ -1,0 +1,27 @@
+From 9cd0023e54adf8b06762c58585b7cb225e5fb2d6 Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Tue, 9 Jan 2024 11:05:45 +0100
+Subject: [PATCH] hostapd: add missing NULL pointer check on radar notification
+
+Fixes a race condition that can lead to a hostapd crash
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+(cherry picked from commit d864f68232e910f2c8ab06a66347fc08c257dfcc)
+---
+ package/network/services/hostapd/src/src/ap/ubus.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/package/network/services/hostapd/src/src/ap/ubus.c b/package/network/services/hostapd/src/src/ap/ubus.c
+index 6ff2257c329b5..66eba99901726 100644
+--- a/package/network/services/hostapd/src/src/ap/ubus.c
++++ b/package/network/services/hostapd/src/src/ap/ubus.c
+@@ -1907,6 +1907,9 @@ void hostapd_ubus_notify_radar_detected(struct hostapd_iface *iface, int frequen
+ 	struct hostapd_data *hapd;
+ 	int i;
+ 
++	if (!ctx)
++		return;
++
+ 	blob_buf_init(&b, 0);
+ 	blobmsg_add_u16(&b, "frequency", frequency);
+ 	blobmsg_add_u16(&b, "width", chan_width);

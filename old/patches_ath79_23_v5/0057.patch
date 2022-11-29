@@ -1,0 +1,86 @@
+From b0fc8b47e0d808c57fcb82ef6eb965668c640c50 Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Thu, 4 Jan 2024 13:46:34 +0100
+Subject: [PATCH] netifd: update to Git openwrt-23.05 (2024-01-04)
+
+c739dee0a37b system-linux: refresh MAC address on DSA port conduit change
+8587c074f1eb interface-ip: fix IPv4 route target masking
+33d6c261aacb system-linux: fix bogus debug error messages on adding bridge members
+0832e8f04778 wireless: add bridge_isolate option
+5ca7a9058e98 bridge: fix reload on bridge vlan changes
+be4ffb3b78bc bridge: rework config change pvid handling
+923c4370a1d4 system-linux: set master early on apply settings
+b9442415c785 system-linux: skip refreshing MAC on master change if custom MAC
+b635a09cdadf system-linux: set pending to 0 on ifindex found or error for if_get_master
+2bbe49c36224 device: Log error message if device initialization failed
+2703f740a23e Revert "system-linux: set pending to 0 on ifindex found or error for if_get_master"
+9cb0cb418303 system-linux: fix race condition in netlink socket error handing
+c18cc79d5000 device: restore cleared flags on device down
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+---
+ package/network/config/netifd/Makefile        |  8 ++---
+ ...ace-ip-fix-IPv4-route-target-masking.patch | 32 -------------------
+ 2 files changed, 4 insertions(+), 36 deletions(-)
+ delete mode 100644 package/network/config/netifd/patches/0001-interface-ip-fix-IPv4-route-target-masking.patch
+
+diff --git a/package/network/config/netifd/Makefile b/package/network/config/netifd/Makefile
+index d237ed181f4ff..b9f0e692d5386 100644
+--- a/package/network/config/netifd/Makefile
++++ b/package/network/config/netifd/Makefile
+@@ -1,13 +1,13 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=netifd
+-PKG_RELEASE:=1.1
++PKG_RELEASE:=1
+ 
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_URL=$(PROJECT_GIT)/project/netifd.git
+-PKG_SOURCE_DATE:=2023-11-10
+-PKG_SOURCE_VERSION:=35facc8306f590a7330789ab6d5785c0d43073ef
+-PKG_MIRROR_HASH:=4f73591ae1873e18df235349e478f2196ca0d3123c313a04149dc9d5e2bfb403
++PKG_SOURCE_DATE:=2024-01-04
++PKG_SOURCE_VERSION:=c18cc79d50002ab8529c21184aceb016c61ac61c
++PKG_MIRROR_HASH:=0a1080ade51dc4a55249c8899d4d384f665e0d21075adab24ea23a2808165e05
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
+ 
+ PKG_LICENSE:=GPL-2.0
+diff --git a/package/network/config/netifd/patches/0001-interface-ip-fix-IPv4-route-target-masking.patch b/package/network/config/netifd/patches/0001-interface-ip-fix-IPv4-route-target-masking.patch
+deleted file mode 100644
+index dd9374a83cfd6..0000000000000
+--- a/package/network/config/netifd/patches/0001-interface-ip-fix-IPv4-route-target-masking.patch
++++ /dev/null
+@@ -1,32 +0,0 @@
+-From 8587c074f1eb2064c42adb0a6aa5073f695ab89d Mon Sep 17 00:00:00 2001
+-From: Jo-Philipp Wich <jo@mein.io>
+-Date: Tue, 14 Nov 2023 14:01:44 +0100
+-Subject: [PATCH] interface-ip: fix IPv4 route target masking
+-
+-A previous commit supposed to mask out excess host bits in route targets
+-failed to correctly calculate the mask value, causing it to produce
+-improper results for certain mask lengths.
+-
+-Fixes: #17
+-Fixes: 76eb342 ("interface-ip: mask out host bits in IPv4 route targets")
+-Signed-off-by: Jo-Philipp Wich <jo@mein.io>
+----
+- interface-ip.c | 2 +-
+- 1 file changed, 1 insertion(+), 1 deletion(-)
+-
+-diff --git a/interface-ip.c b/interface-ip.c
+-index d2fe385..28e7106 100644
+---- a/interface-ip.c
+-+++ b/interface-ip.c
+-@@ -448,7 +448,7 @@ interface_ip_add_route(struct interface *iface, struct blob_attr *attr, bool v6)
+- 
+- 		/* Mask out IPv4 host bits to avoid "Invalid prefix for given prefix length" */
+- 		if (af == AF_INET && route->mask < 32)
+--			route->addr.in.s_addr &= ((1u << route->mask) - 1);
+-+			clear_if_addr(&route->addr, route->mask);
+- 	}
+- 
+- 	if ((cur = tb[ROUTE_GATEWAY]) != NULL) {
+--- 
+-2.39.1
+-

@@ -1,0 +1,102 @@
+diff --git a/target/linux/generic/backport-5.15/819-v6.6-0018-nvmem-imx-correct-nregs-for-i.MX6SLL.patch b/target/linux/generic/backport-5.15/819-v6.6-0018-nvmem-imx-correct-nregs-for-i.MX6SLL.patch
+deleted file mode 100644
+index 8901a41a644af..0000000000000
+--- a/target/linux/generic/backport-5.15/819-v6.6-0018-nvmem-imx-correct-nregs-for-i.MX6SLL.patch
++++ /dev/null
+@@ -1,28 +0,0 @@
+-From 414a98abbefd82d591f4e2d1efd2917bcd3b6f6d Mon Sep 17 00:00:00 2001
+-From: Peng Fan <peng.fan@nxp.com>
+-Date: Fri, 13 Oct 2023 13:49:02 +0100
+-Subject: [PATCH] nvmem: imx: correct nregs for i.MX6SLL
+-
+-The nregs for i.MX6SLL should be 80 per fuse map, correct it.
+-
+-Fixes: 6da27821a6f5 ("nvmem: imx-ocotp: add support for imx6sll")
+-Cc: Stable@vger.kernel.org
+-Signed-off-by: Peng Fan <peng.fan@nxp.com>
+-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+-Link: https://lore.kernel.org/r/20231013124904.175782-2-srinivas.kandagatla@linaro.org
+-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+----
+- drivers/nvmem/imx-ocotp.c | 2 +-
+- 1 file changed, 1 insertion(+), 1 deletion(-)
+-
+---- a/drivers/nvmem/imx-ocotp.c
+-+++ b/drivers/nvmem/imx-ocotp.c
+-@@ -499,7 +499,7 @@ static const struct ocotp_params imx6sl_
+- };
+- 
+- static const struct ocotp_params imx6sll_params = {
+--	.nregs = 128,
+-+	.nregs = 80,
+- 	.bank_address_words = 0,
+- 	.set_timing = imx_ocotp_set_imx6_timing,
+- 	.ctrl = IMX_OCOTP_BM_CTRL_DEFAULT,
+diff --git a/target/linux/generic/backport-5.15/819-v6.6-0019-nvmem-imx-correct-nregs-for-i.MX6UL.patch b/target/linux/generic/backport-5.15/819-v6.6-0019-nvmem-imx-correct-nregs-for-i.MX6UL.patch
+deleted file mode 100644
+index db6b951d24542..0000000000000
+--- a/target/linux/generic/backport-5.15/819-v6.6-0019-nvmem-imx-correct-nregs-for-i.MX6UL.patch
++++ /dev/null
+@@ -1,28 +0,0 @@
+-From 7d6e10f5d254681983b53d979422c8de3fadbefb Mon Sep 17 00:00:00 2001
+-From: Peng Fan <peng.fan@nxp.com>
+-Date: Fri, 13 Oct 2023 13:49:03 +0100
+-Subject: [PATCH] nvmem: imx: correct nregs for i.MX6UL
+-
+-The nregs for i.MX6UL should be 144 per fuse map, correct it.
+-
+-Fixes: 4aa2b4802046 ("nvmem: octop: Add support for imx6ul")
+-Cc: Stable@vger.kernel.org
+-Signed-off-by: Peng Fan <peng.fan@nxp.com>
+-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+-Link: https://lore.kernel.org/r/20231013124904.175782-3-srinivas.kandagatla@linaro.org
+-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+----
+- drivers/nvmem/imx-ocotp.c | 2 +-
+- 1 file changed, 1 insertion(+), 1 deletion(-)
+-
+---- a/drivers/nvmem/imx-ocotp.c
+-+++ b/drivers/nvmem/imx-ocotp.c
+-@@ -513,7 +513,7 @@ static const struct ocotp_params imx6sx_
+- };
+- 
+- static const struct ocotp_params imx6ul_params = {
+--	.nregs = 128,
+-+	.nregs = 144,
+- 	.bank_address_words = 0,
+- 	.set_timing = imx_ocotp_set_imx6_timing,
+- 	.ctrl = IMX_OCOTP_BM_CTRL_DEFAULT,
+diff --git a/target/linux/generic/backport-5.15/819-v6.6-0020-nvmem-imx-correct-nregs-for-i.MX6ULL.patch b/target/linux/generic/backport-5.15/819-v6.6-0020-nvmem-imx-correct-nregs-for-i.MX6ULL.patch
+deleted file mode 100644
+index 10ce7cd9f28ac..0000000000000
+--- a/target/linux/generic/backport-5.15/819-v6.6-0020-nvmem-imx-correct-nregs-for-i.MX6ULL.patch
++++ /dev/null
+@@ -1,28 +0,0 @@
+-From 2382c1b044231fd49eaf9aa82bc7113fc55487b8 Mon Sep 17 00:00:00 2001
+-From: Peng Fan <peng.fan@nxp.com>
+-Date: Fri, 13 Oct 2023 13:49:04 +0100
+-Subject: [PATCH] nvmem: imx: correct nregs for i.MX6ULL
+-
+-The nregs for i.MX6ULL should be 80 per fuse map, correct it.
+-
+-Fixes: ffbc34bf0e9c ("nvmem: imx-ocotp: Implement i.MX6ULL/ULZ support")
+-Cc: Stable@vger.kernel.org
+-Signed-off-by: Peng Fan <peng.fan@nxp.com>
+-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+-Link: https://lore.kernel.org/r/20231013124904.175782-4-srinivas.kandagatla@linaro.org
+-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+----
+- drivers/nvmem/imx-ocotp.c | 2 +-
+- 1 file changed, 1 insertion(+), 1 deletion(-)
+-
+---- a/drivers/nvmem/imx-ocotp.c
+-+++ b/drivers/nvmem/imx-ocotp.c
+-@@ -520,7 +520,7 @@ static const struct ocotp_params imx6ul_
+- };
+- 
+- static const struct ocotp_params imx6ull_params = {
+--	.nregs = 64,
+-+	.nregs = 80,
+- 	.bank_address_words = 0,
+- 	.set_timing = imx_ocotp_set_imx6_timing,
+- 	.ctrl = IMX_OCOTP_BM_CTRL_DEFAULT,

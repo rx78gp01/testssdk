@@ -1,0 +1,53 @@
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 5cc07434b2a6c..d93ae194b8aa1 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .147
+-LINUX_KERNEL_HASH-5.15.147 = 56c1e65625d201db431efda7a3816e7b424071e7cb0245b2ba594d15b1fdfcd4
++LINUX_VERSION-5.15 = .148
++LINUX_KERNEL_HASH-5.15.148 = c48575c97fd9f4767cbe50a13b1b2b40ee42830aba3182fabd35a03259a6e5d8
+diff --git a/target/linux/generic/hack-5.15/321-powerpc_crtsavres_prereq.patch b/target/linux/generic/hack-5.15/321-powerpc_crtsavres_prereq.patch
+deleted file mode 100644
+index f1942e2037598..0000000000000
+--- a/target/linux/generic/hack-5.15/321-powerpc_crtsavres_prereq.patch
++++ /dev/null
+@@ -1,38 +0,0 @@
+-From 107c0964cb8db7ca28ac5199426414fdab3c274d Mon Sep 17 00:00:00 2001
+-From: "Alexandros C. Couloumbis" <alex@ozo.com>
+-Date: Fri, 7 Jul 2017 17:14:51 +0200
+-Subject: hack: arch: powerpc: drop register save/restore library from modules
+-
+-Upstream GCC uses a libgcc function for saving/restoring registers. This
+-makes the code bigger, and upstream kernels need to carry that function
+-for every single kernel module. Our GCC is patched to avoid those
+-references, so we can drop the extra bloat for modules.
+-
+-lede-commit: e8e1084654f50904e6bf77b70b2de3f137d7b3ec
+-Signed-off-by: Alexandros C. Couloumbis <alex@ozo.com>
+----
+- arch/powerpc/Makefile | 1 -
+- 1 file changed, 1 deletion(-)
+-
+---- a/arch/powerpc/Makefile
+-+++ b/arch/powerpc/Makefile
+-@@ -44,19 +44,6 @@ machine-$(CONFIG_PPC64) += 64
+- machine-$(CONFIG_CPU_LITTLE_ENDIAN) += le
+- UTS_MACHINE := $(subst $(space),,$(machine-y))
+- 
+--# XXX This needs to be before we override LD below
+--ifdef CONFIG_PPC32
+--KBUILD_LDFLAGS_MODULE += arch/powerpc/lib/crtsavres.o
+--else
+--ifeq ($(call ld-ifversion, -ge, 22500, y),y)
+--# Have the linker provide sfpr if possible.
+--# There is a corresponding test in arch/powerpc/lib/Makefile
+--KBUILD_LDFLAGS_MODULE += --save-restore-funcs
+--else
+--KBUILD_LDFLAGS_MODULE += arch/powerpc/lib/crtsavres.o
+--endif
+--endif
+--
+- ifdef CONFIG_CPU_LITTLE_ENDIAN
+- KBUILD_CFLAGS	+= -mlittle-endian
+- KBUILD_LDFLAGS	+= -EL

@@ -1,0 +1,29 @@
+From b79583c97513bebcea1e4a47792b0cf112dcbd68 Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Fri, 9 Feb 2024 12:18:57 +0100
+Subject: [PATCH] wifi-scripts: fix fullmac phy detection
+
+Checking for AP_VLAN misdetects ath10k-ath12k as fullmac, because of software
+crypto limitations. Check for monitor mode support instead, which is more
+reliable.
+
+Fixes: https://github.com/openwrt/openwrt/issues/14575
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+(cherry picked from commit 2b4941a6f16fa1c045cb2f4a8fc09adc64fecd63)
+---
+ package/network/services/hostapd/files/common.uc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/network/services/hostapd/files/common.uc b/package/network/services/hostapd/files/common.uc
+index 4c33779af935e..750e3ae71c27d 100644
+--- a/package/network/services/hostapd/files/common.uc
++++ b/package/network/services/hostapd/files/common.uc
+@@ -49,7 +49,7 @@ function __phy_is_fullmac(phyidx)
+ {
+ 	let data = nl80211.request(nl80211.const.NL80211_CMD_GET_WIPHY, 0, { wiphy: phyidx });
+ 
+-	return !data.software_iftypes.ap_vlan;
++	return !data.software_iftypes.monitor;
+ }
+ 
+ function phy_is_fullmac(phy)

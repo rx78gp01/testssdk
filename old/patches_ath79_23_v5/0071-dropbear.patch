@@ -1,0 +1,398 @@
+From 6549a711be6cb9788aaaec6d31e3396b21893163 Mon Sep 17 00:00:00 2001
+From: Konstantin Demin <rockdrilla@gmail.com>
+Date: Tue, 9 Jan 2024 03:40:01 +0300
+Subject: [PATCH] dropbear: cherry-pick upstream patches
+
+critical fixes:
+- libtommath: possible integer overflow (CVE-2023-36328)
+- implement Strict KEX mode (CVE-2023-48795)
+
+various fixes:
+- fix DROPBEAR_DSS and DROPBEAR_RSA config options
+- y2038 issues
+- remove SO_LINGER socket option
+- make banner reading failure non-fatal
+- fix "noremotetcp" behavior
+- don't try to shutdown a pty
+- fix test for multiuser kernels
+
+adds new features:
+- option to bind to interface
+- allow inetd with non-syslog
+- ignore unsupported command line options with dropbearkey
+
+Signed-off-by: Konstantin Demin <rockdrilla@gmail.com>
+(cherry picked from commit b5cde260487eae86db1661a53e5e5e0823936aab)
+[Only add the patches fixing security problems]
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+Tested-by: Stijn Segers <foss@volatilesystems.org>
+---
+ package/network/services/dropbear/Makefile    |   2 +-
+ ...ommath-fix-possible-integer-overflow.patch | 121 ++++++++++
+ .../021-Implement-Strict-KEX-mode.patch       | 216 ++++++++++++++++++
+ 3 files changed, 338 insertions(+), 1 deletion(-)
+ create mode 100644 package/network/services/dropbear/patches/015-libtommath-fix-possible-integer-overflow.patch
+ create mode 100644 package/network/services/dropbear/patches/021-Implement-Strict-KEX-mode.patch
+
+diff --git a/package/network/services/dropbear/Makefile b/package/network/services/dropbear/Makefile
+index e98e995ba7b9a..eec02bccc4025 100644
+--- a/package/network/services/dropbear/Makefile
++++ b/package/network/services/dropbear/Makefile
+@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=dropbear
+ PKG_VERSION:=2022.82
+-PKG_RELEASE:=5
++PKG_RELEASE:=6
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+ PKG_SOURCE_URL:= \
+diff --git a/package/network/services/dropbear/patches/015-libtommath-fix-possible-integer-overflow.patch b/package/network/services/dropbear/patches/015-libtommath-fix-possible-integer-overflow.patch
+new file mode 100644
+index 0000000000000..f39417adb7948
+--- /dev/null
++++ b/package/network/services/dropbear/patches/015-libtommath-fix-possible-integer-overflow.patch
+@@ -0,0 +1,121 @@
++From 3b576d95dcf791d7b945e75f639da8f89c1685a2 Mon Sep 17 00:00:00 2001
++From: czurnieden <czurnieden@gmx.de>
++Date: Tue, 9 May 2023 17:17:12 +0200
++Subject: Fix possible integer overflow
++
++---
++ libtommath/bn_mp_2expt.c                | 4 ++++
++ libtommath/bn_mp_grow.c                 | 4 ++++
++ libtommath/bn_mp_init_size.c            | 5 +++++
++ libtommath/bn_mp_mul_2d.c               | 4 ++++
++ libtommath/bn_s_mp_mul_digs.c           | 4 ++++
++ libtommath/bn_s_mp_mul_digs_fast.c      | 4 ++++
++ libtommath/bn_s_mp_mul_high_digs.c      | 4 ++++
++ libtommath/bn_s_mp_mul_high_digs_fast.c | 4 ++++
++ 8 files changed, 33 insertions(+)
++
++--- a/libtommath/bn_mp_2expt.c
+++++ b/libtommath/bn_mp_2expt.c
++@@ -12,6 +12,10 @@ mp_err mp_2expt(mp_int *a, int b)
++ {
++    mp_err    err;
++ 
+++   if (b < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* zero a as per default */
++    mp_zero(a);
++ 
++--- a/libtommath/bn_mp_grow.c
+++++ b/libtommath/bn_mp_grow.c
++@@ -9,6 +9,10 @@ mp_err mp_grow(mp_int *a, int size)
++    int     i;
++    mp_digit *tmp;
++ 
+++   if (size < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* if the alloc size is smaller alloc more ram */
++    if (a->alloc < size) {
++       /* reallocate the array a->dp
++--- a/libtommath/bn_mp_init_size.c
+++++ b/libtommath/bn_mp_init_size.c
++@@ -6,6 +6,11 @@
++ /* init an mp_init for a given size */
++ mp_err mp_init_size(mp_int *a, int size)
++ {
+++
+++   if (size < 0) {
+++      return MP_VAL;
+++   }
+++
++    size = MP_MAX(MP_MIN_PREC, size);
++ 
++    /* alloc mem */
++--- a/libtommath/bn_mp_mul_2d.c
+++++ b/libtommath/bn_mp_mul_2d.c
++@@ -9,6 +9,10 @@ mp_err mp_mul_2d(const mp_int *a, int b,
++    mp_digit d;
++    mp_err   err;
++ 
+++   if (b < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* copy */
++    if (a != c) {
++       if ((err = mp_copy(a, c)) != MP_OKAY) {
++--- a/libtommath/bn_s_mp_mul_digs.c
+++++ b/libtommath/bn_s_mp_mul_digs.c
++@@ -16,6 +16,10 @@ mp_err s_mp_mul_digs(const mp_int *a, co
++    mp_word r;
++    mp_digit tmpx, *tmpt, *tmpy;
++ 
+++   if (digs < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* can we use the fast multiplier? */
++    if ((digs < MP_WARRAY) &&
++        (MP_MIN(a->used, b->used) < MP_MAXFAST)) {
++--- a/libtommath/bn_s_mp_mul_digs_fast.c
+++++ b/libtommath/bn_s_mp_mul_digs_fast.c
++@@ -26,6 +26,10 @@ mp_err s_mp_mul_digs_fast(const mp_int *
++    mp_digit W[MP_WARRAY];
++    mp_word  _W;
++ 
+++   if (digs < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* grow the destination as required */
++    if (c->alloc < digs) {
++       if ((err = mp_grow(c, digs)) != MP_OKAY) {
++--- a/libtommath/bn_s_mp_mul_high_digs.c
+++++ b/libtommath/bn_s_mp_mul_high_digs.c
++@@ -15,6 +15,10 @@ mp_err s_mp_mul_high_digs(const mp_int *
++    mp_word  r;
++    mp_digit tmpx, *tmpt, *tmpy;
++ 
+++   if (digs < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* can we use the fast multiplier? */
++    if (MP_HAS(S_MP_MUL_HIGH_DIGS_FAST)
++        && ((a->used + b->used + 1) < MP_WARRAY)
++--- a/libtommath/bn_s_mp_mul_high_digs_fast.c
+++++ b/libtommath/bn_s_mp_mul_high_digs_fast.c
++@@ -19,6 +19,10 @@ mp_err s_mp_mul_high_digs_fast(const mp_
++    mp_digit W[MP_WARRAY];
++    mp_word  _W;
++ 
+++   if (digs < 0) {
+++      return MP_VAL;
+++   }
+++
++    /* grow the destination as required */
++    pa = a->used + b->used;
++    if (c->alloc < pa) {
+diff --git a/package/network/services/dropbear/patches/021-Implement-Strict-KEX-mode.patch b/package/network/services/dropbear/patches/021-Implement-Strict-KEX-mode.patch
+new file mode 100644
+index 0000000000000..e4a279b9ab739
+--- /dev/null
++++ b/package/network/services/dropbear/patches/021-Implement-Strict-KEX-mode.patch
+@@ -0,0 +1,216 @@
++From 6e43be5c7b99dbee49dc72b6f989f29fdd7e9356 Mon Sep 17 00:00:00 2001
++From: Matt Johnston <matt@ucc.asn.au>
++Date: Mon, 20 Nov 2023 14:02:47 +0800
++Subject: Implement Strict KEX mode
++
++As specified by OpenSSH with kex-strict-c-v00@openssh.com and
++kex-strict-s-v00@openssh.com.
++---
++ cli-session.c    | 11 +++++++++++
++ common-algo.c    |  6 ++++++
++ common-kex.c     | 26 +++++++++++++++++++++++++-
++ kex.h            |  3 +++
++ process-packet.c | 34 +++++++++++++++++++---------------
++ ssh.h            |  4 ++++
++ svr-session.c    |  3 +++
++ 7 files changed, 71 insertions(+), 16 deletions(-)
++
++--- a/cli-session.c
+++++ b/cli-session.c
++@@ -46,6 +46,7 @@ static void cli_finished(void) ATTRIB_NO
++ static void recv_msg_service_accept(void);
++ static void cli_session_cleanup(void);
++ static void recv_msg_global_request_cli(void);
+++static void cli_algos_initialise(void);
++ 
++ struct clientsession cli_ses; /* GLOBAL */
++ 
++@@ -117,6 +118,7 @@ void cli_session(int sock_in, int sock_o
++ 	}
++ 
++ 	chaninitialise(cli_chantypes);
+++	cli_algos_initialise();
++ 
++ 	/* Set up cli_ses vars */
++ 	cli_session_init(proxy_cmd_pid);
++@@ -487,3 +489,12 @@ void cli_dropbear_log(int priority, cons
++ 	fflush(stderr);
++ }
++ 
+++static void cli_algos_initialise(void) {
+++	algo_type *algo;
+++	for (algo = sshkex; algo->name; algo++) {
+++		if (strcmp(algo->name, SSH_STRICT_KEX_S) == 0) {
+++			algo->usable = 0;
+++		}
+++	}
+++}
+++
++--- a/common-algo.c
+++++ b/common-algo.c
++@@ -315,6 +315,12 @@ algo_type sshkex[] = {
++ 	{SSH_EXT_INFO_C, 0, NULL, 1, NULL},
++ #endif
++ #endif
+++#if DROPBEAR_CLIENT
+++	{SSH_STRICT_KEX_C, 0, NULL, 1, NULL},
+++#endif
+++#if DROPBEAR_SERVER
+++	{SSH_STRICT_KEX_S, 0, NULL, 1, NULL},
+++#endif
++ 	{NULL, 0, NULL, 0, NULL}
++ };
++ 
++--- a/common-kex.c
+++++ b/common-kex.c
++@@ -183,6 +183,10 @@ void send_msg_newkeys() {
++ 	gen_new_keys();
++ 	switch_keys();
++ 
+++	if (ses.kexstate.strict_kex) {
+++		ses.transseq = 0;
+++	}
+++
++ 	TRACE(("leave send_msg_newkeys"))
++ }
++ 
++@@ -193,7 +197,11 @@ void recv_msg_newkeys() {
++ 
++ 	ses.kexstate.recvnewkeys = 1;
++ 	switch_keys();
++-	
+++
+++	if (ses.kexstate.strict_kex) {
+++		ses.recvseq = 0;
+++	}
+++
++ 	TRACE(("leave recv_msg_newkeys"))
++ }
++ 
++@@ -550,6 +558,10 @@ void recv_msg_kexinit() {
++ 
++ 	ses.kexstate.recvkexinit = 1;
++ 
+++	if (ses.kexstate.strict_kex && !ses.kexstate.donefirstkex && ses.recvseq != 1) {
+++		dropbear_exit("First packet wasn't kexinit");
+++	}
+++
++ 	TRACE(("leave recv_msg_kexinit"))
++ }
++ 
++@@ -859,6 +871,18 @@ static void read_kex_algos() {
++ 	}
++ #endif
++ 
+++	if (!ses.kexstate.donefirstkex) {
+++		const char* strict_name;
+++		if (IS_DROPBEAR_CLIENT) {
+++			strict_name = SSH_STRICT_KEX_S;
+++		} else {
+++			strict_name = SSH_STRICT_KEX_C;
+++		}
+++		if (buf_has_algo(ses.payload, strict_name) == DROPBEAR_SUCCESS) {
+++			ses.kexstate.strict_kex = 1;
+++		}
+++	}
+++
++ 	algo = buf_match_algo(ses.payload, sshkex, kexguess2, &goodguess);
++ 	allgood &= goodguess;
++ 	if (algo == NULL || algo->data == NULL) {
++--- a/kex.h
+++++ b/kex.h
++@@ -83,6 +83,9 @@ struct KEXState {
++ 
++ 	unsigned our_first_follows_matches : 1;
++ 
+++	/* Boolean indicating that strict kex mode is in use */
+++	unsigned int strict_kex;
+++
++ 	time_t lastkextime; /* time of the last kex */
++ 	unsigned int datatrans; /* data transmitted since last kex */
++ 	unsigned int datarecv; /* data received since last kex */
++--- a/process-packet.c
+++++ b/process-packet.c
++@@ -44,6 +44,7 @@ void process_packet() {
++ 
++ 	unsigned char type;
++ 	unsigned int i;
+++	unsigned int first_strict_kex = ses.kexstate.strict_kex && !ses.kexstate.donefirstkex;
++ 	time_t now;
++ 
++ 	TRACE2(("enter process_packet"))
++@@ -54,22 +55,24 @@ void process_packet() {
++ 	now = monotonic_now();
++ 	ses.last_packet_time_keepalive_recv = now;
++ 
++-	/* These packets we can receive at any time */
++-	switch(type) {
++ 
++-		case SSH_MSG_IGNORE:
++-			goto out;
++-		case SSH_MSG_DEBUG:
++-			goto out;
++-
++-		case SSH_MSG_UNIMPLEMENTED:
++-			/* debugging XXX */
++-			TRACE(("SSH_MSG_UNIMPLEMENTED"))
++-			goto out;
++-			
++-		case SSH_MSG_DISCONNECT:
++-			/* TODO cleanup? */
++-			dropbear_close("Disconnect received");
+++	if (type == SSH_MSG_DISCONNECT) {
+++		/* Allowed at any time */
+++		dropbear_close("Disconnect received");
+++	}
+++
+++	/* These packets may be received at any time,
+++	   except during first kex with strict kex */
+++	if (!first_strict_kex) {
+++		switch(type) {
+++			case SSH_MSG_IGNORE:
+++				goto out;
+++			case SSH_MSG_DEBUG:
+++				goto out;
+++			case SSH_MSG_UNIMPLEMENTED:
+++				TRACE(("SSH_MSG_UNIMPLEMENTED"))
+++				goto out;
+++		}
++ 	}
++ 
++ 	/* Ignore these packet types so that keepalives don't interfere with
++@@ -98,7 +101,8 @@ void process_packet() {
++ 			if (type >= 1 && type <= 49
++ 				&& type != SSH_MSG_SERVICE_REQUEST
++ 				&& type != SSH_MSG_SERVICE_ACCEPT
++-				&& type != SSH_MSG_KEXINIT)
+++				&& type != SSH_MSG_KEXINIT
+++				&& !first_strict_kex)
++ 			{
++ 				TRACE(("unknown allowed packet during kexinit"))
++ 				recv_unimplemented();
++--- a/ssh.h
+++++ b/ssh.h
++@@ -100,6 +100,10 @@
++ #define SSH_EXT_INFO_C "ext-info-c"
++ #define SSH_SERVER_SIG_ALGS "server-sig-algs"
++ 
+++/* OpenSSH strict KEX feature */
+++#define SSH_STRICT_KEX_S "kex-strict-s-v00@openssh.com"
+++#define SSH_STRICT_KEX_C "kex-strict-c-v00@openssh.com"
+++
++ /* service types */
++ #define SSH_SERVICE_USERAUTH "ssh-userauth"
++ #define SSH_SERVICE_USERAUTH_LEN 12
++--- a/svr-session.c
+++++ b/svr-session.c
++@@ -368,6 +368,9 @@ static void svr_algos_initialise(void) {
++ 			algo->usable = 0;
++ 		}
++ #endif
+++		if (strcmp(algo->name, SSH_STRICT_KEX_C) == 0) {
+++			algo->usable = 0;
+++		}
++ 	}
++ }
++ 

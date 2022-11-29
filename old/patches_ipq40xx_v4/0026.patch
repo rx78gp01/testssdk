@@ -1,0 +1,122 @@
+From 269896fed0dfc079cee9447cd18624f931b2a738 Mon Sep 17 00:00:00 2001
+From: John Audia <therealgraysky@proton.me>
+Date: Wed, 11 Oct 2023 15:53:45 -0400
+Subject: [PATCH] kernel: bump 5.15 to 5.15.135
+
+Changelog: https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.135
+
+All patches automatically rebased.
+
+Build system: x86_64
+Build-tested: ramips/tplink_archer-a6-v3
+Run-tested: ramips/tplink_archer-a6-v3
+
+Signed-off-by: John Audia <therealgraysky@proton.me>
+[Refreshed on top of OpenWrt 23.05]
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+(cherry picked from commit 096bb8ed82cebeb8926a5b64466afec649385159)
+---
+ include/kernel-5.15                                       | 4 ++--
+ .../ath79/patches-5.15/910-unaligned_access_hacks.patch   | 8 ++++----
+ .../711-net-dsa-mv88e6xxx-disable-ATU-violation.patch     | 2 +-
+ ...auto-attach-mtd-device-named-ubi-or-data-on-boot.patch | 4 ++--
+ ...-mv88e6xxx-Request-assisted-learning-on-CPU-port.patch | 2 +-
+ 5 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 35a21308aab1d..313e735a5430a 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .134
+-LINUX_KERNEL_HASH-5.15.134 = f37182aecb57ed6853d01e1074d3a60a653331e35f3115728381e08be050b9d3
++LINUX_VERSION-5.15 = .135
++LINUX_KERNEL_HASH-5.15.135 = 14835e629e237f136cfed484fdb533c95242429809bdcdb2a2d66dfcb7447170
+diff --git a/target/linux/ath79/patches-5.15/910-unaligned_access_hacks.patch b/target/linux/ath79/patches-5.15/910-unaligned_access_hacks.patch
+index 53f5b1472d9c5..47216bee71f9f 100644
+--- a/target/linux/ath79/patches-5.15/910-unaligned_access_hacks.patch
++++ b/target/linux/ath79/patches-5.15/910-unaligned_access_hacks.patch
+@@ -349,7 +349,7 @@ SVN-Revision: 35130
+  	list_for_each_entry(p, head, list) {
+ --- a/net/ipv4/tcp_output.c
+ +++ b/net/ipv4/tcp_output.c
+-@@ -610,48 +610,53 @@ static void tcp_options_write(__be32 *pt
++@@ -609,48 +609,53 @@ static void tcp_options_write(__be32 *pt
+  	u16 options = opts->options;	/* mungable copy */
+  
+  	if (unlikely(OPTION_MD5 & options)) {
+@@ -426,7 +426,7 @@ SVN-Revision: 35130
+  	}
+  
+  	if (unlikely(opts->num_sack_blocks)) {
+-@@ -659,16 +664,17 @@ static void tcp_options_write(__be32 *pt
++@@ -658,16 +663,17 @@ static void tcp_options_write(__be32 *pt
+  			tp->duplicate_sack : tp->selective_acks;
+  		int this_sack;
+  
+@@ -450,7 +450,7 @@ SVN-Revision: 35130
+  		}
+  
+  		tp->rx_opt.dsack = 0;
+-@@ -681,13 +687,14 @@ static void tcp_options_write(__be32 *pt
++@@ -680,13 +686,14 @@ static void tcp_options_write(__be32 *pt
+  
+  		if (foc->exp) {
+  			len = TCPOLEN_EXP_FASTOPEN_BASE + foc->len;
+@@ -750,7 +750,7 @@ SVN-Revision: 35130
+  EXPORT_SYMBOL(xfrm_parse_spi);
+ --- a/net/ipv4/tcp_input.c
+ +++ b/net/ipv4/tcp_input.c
+-@@ -4157,14 +4157,16 @@ static bool tcp_parse_aligned_timestamp(
++@@ -4170,14 +4170,16 @@ static bool tcp_parse_aligned_timestamp(
+  {
+  	const __be32 *ptr = (const __be32 *)(th + 1);
+  
+diff --git a/target/linux/generic/hack-5.15/711-net-dsa-mv88e6xxx-disable-ATU-violation.patch b/target/linux/generic/hack-5.15/711-net-dsa-mv88e6xxx-disable-ATU-violation.patch
+index f6dacb6e50368..c5f86c030f825 100644
+--- a/target/linux/generic/hack-5.15/711-net-dsa-mv88e6xxx-disable-ATU-violation.patch
++++ b/target/linux/generic/hack-5.15/711-net-dsa-mv88e6xxx-disable-ATU-violation.patch
+@@ -9,7 +9,7 @@ Subject: [PATCH] net/dsa/mv88e6xxx: disable ATU violation
+ 
+ --- a/drivers/net/dsa/mv88e6xxx/chip.c
+ +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+-@@ -2993,6 +2993,9 @@ static int mv88e6xxx_setup_port(struct m
++@@ -2995,6 +2995,9 @@ static int mv88e6xxx_setup_port(struct m
+  	else
+  		reg = 1 << port;
+  
+diff --git a/target/linux/generic/pending-5.15/490-ubi-auto-attach-mtd-device-named-ubi-or-data-on-boot.patch b/target/linux/generic/pending-5.15/490-ubi-auto-attach-mtd-device-named-ubi-or-data-on-boot.patch
+index 2751da541a054..e8da36edba5be 100644
+--- a/target/linux/generic/pending-5.15/490-ubi-auto-attach-mtd-device-named-ubi-or-data-on-boot.patch
++++ b/target/linux/generic/pending-5.15/490-ubi-auto-attach-mtd-device-named-ubi-or-data-on-boot.patch
+@@ -8,7 +8,7 @@ Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+ 
+ --- a/drivers/mtd/ubi/build.c
+ +++ b/drivers/mtd/ubi/build.c
+-@@ -1200,6 +1200,73 @@ static struct mtd_info * __init open_mtd
++@@ -1207,6 +1207,73 @@ static struct mtd_info * __init open_mtd
+  	return mtd;
+  }
+  
+@@ -82,7 +82,7 @@ Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+  static int __init ubi_init(void)
+  {
+  	int err, i, k;
+-@@ -1283,6 +1350,12 @@ static int __init ubi_init(void)
++@@ -1290,6 +1357,12 @@ static int __init ubi_init(void)
+  		}
+  	}
+  
+diff --git a/target/linux/generic/pending-5.15/768-net-dsa-mv88e6xxx-Request-assisted-learning-on-CPU-port.patch b/target/linux/generic/pending-5.15/768-net-dsa-mv88e6xxx-Request-assisted-learning-on-CPU-port.patch
+index 5aa540acf7772..98d5d6d4f0640 100644
+--- a/target/linux/generic/pending-5.15/768-net-dsa-mv88e6xxx-Request-assisted-learning-on-CPU-port.patch
++++ b/target/linux/generic/pending-5.15/768-net-dsa-mv88e6xxx-Request-assisted-learning-on-CPU-port.patch
+@@ -17,7 +17,7 @@ Signed-off-by: Tobias Waldekranz <tobias@waldekranz.com>
+ 
+ --- a/drivers/net/dsa/mv88e6xxx/chip.c
+ +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+-@@ -6341,6 +6341,7 @@ static int mv88e6xxx_register_switch(str
++@@ -6343,6 +6343,7 @@ static int mv88e6xxx_register_switch(str
+  	ds->ops = &mv88e6xxx_switch_ops;
+  	ds->ageing_time_min = chip->info->age_time_coeff;
+  	ds->ageing_time_max = chip->info->age_time_coeff * U8_MAX;

@@ -1,0 +1,90 @@
+From 44cd90c49a7457345c0fba186d5d762d3a04d854 Mon Sep 17 00:00:00 2001
+From: Ivan Pavlov <AuthorReflex@gmail.com>
+Date: Fri, 2 Feb 2024 08:46:52 +0300
+Subject: [PATCH] openssl: update to 3.0.13
+
+Major changes between OpenSSL 3.0.12 and OpenSSL 3.0.13 [30 Jan 2024]
+
+  * Fixed PKCS12 Decoding crashes
+    ([CVE-2024-0727])
+  * Fixed Excessive time spent checking invalid RSA public keys
+    ([CVE-2023-6237])
+  * Fixed POLY1305 MAC implementation corrupting vector registers on PowerPC
+    CPUs which support PowerISA 2.07
+    ([CVE-2023-6129])
+  * Fix excessive time spent in DH check / generation with large Q parameter
+    value ([CVE-2023-5678])
+
+Signed-off-by: Ivan Pavlov <AuthorReflex@gmail.com>
+---
+ package/libs/openssl/Makefile                               | 4 ++--
+ .../libs/openssl/patches/100-Configure-afalg-support.patch  | 2 +-
+ .../libs/openssl/patches/140-allow-prefer-chacha20.patch    | 6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/package/libs/openssl/Makefile b/package/libs/openssl/Makefile
+index 4b1388e7af6d4..3bb60bc5ed753 100644
+--- a/package/libs/openssl/Makefile
++++ b/package/libs/openssl/Makefile
+@@ -8,7 +8,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=openssl
+-PKG_VERSION:=3.0.12
++PKG_VERSION:=3.0.13
+ PKG_RELEASE:=1
+ PKG_BUILD_FLAGS:=no-mips16 gc-sections no-lto
+ 
+@@ -24,7 +24,7 @@ PKG_SOURCE_URL:= \
+ 	ftp://ftp.pca.dfn.de/pub/tools/net/openssl/source/ \
+ 	ftp://ftp.pca.dfn.de/pub/tools/net/openssl/source/old/$(PKG_BASE)/
+ 
+-PKG_HASH:=f93c9e8edde5e9166119de31755fc87b4aa34863662f67ddfcba14d0b6b69b61
++PKG_HASH:=88525753f79d3bec27d2fa7c66aa0b92b3aa9498dafd93d7cfa4b3780cdae313
+ 
+ PKG_LICENSE:=Apache-2.0
+ PKG_LICENSE_FILES:=LICENSE
+diff --git a/package/libs/openssl/patches/100-Configure-afalg-support.patch b/package/libs/openssl/patches/100-Configure-afalg-support.patch
+index 307e23b80924d..e9cd7bf9c1afa 100644
+--- a/package/libs/openssl/patches/100-Configure-afalg-support.patch
++++ b/package/libs/openssl/patches/100-Configure-afalg-support.patch
+@@ -10,7 +10,7 @@ Signed-off-by: Eneas U de Queiroz <cote2004-github@yahoo.com>
+ 
+ --- a/Configure
+ +++ b/Configure
+-@@ -1674,7 +1674,9 @@ $config{CFLAGS} = [ map { $_ eq '--ossl-
++@@ -1677,7 +1677,9 @@ $config{CFLAGS} = [ map { $_ eq '--ossl-
+  
+  unless ($disabled{afalgeng}) {
+      $config{afalgeng}="";
+diff --git a/package/libs/openssl/patches/140-allow-prefer-chacha20.patch b/package/libs/openssl/patches/140-allow-prefer-chacha20.patch
+index 43fd92e3886cf..fb7bc8436174c 100644
+--- a/package/libs/openssl/patches/140-allow-prefer-chacha20.patch
++++ b/package/libs/openssl/patches/140-allow-prefer-chacha20.patch
+@@ -16,7 +16,7 @@ Signed-off-by: Eneas U de Queiroz <cote2004-github@yahoo.com>
+ 
+ --- a/ssl/ssl_ciph.c
+ +++ b/ssl/ssl_ciph.c
+-@@ -1505,11 +1505,29 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_
++@@ -1506,11 +1506,29 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_
+      ssl_cipher_apply_rule(0, SSL_kECDHE, 0, 0, 0, 0, 0, CIPHER_DEL, -1, &head,
+                            &tail);
+  
+@@ -46,7 +46,7 @@ Signed-off-by: Eneas U de Queiroz <cote2004-github@yahoo.com>
+  
+      /*
+       * ...and generally, our preferred cipher is AES.
+-@@ -1564,7 +1582,7 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_
++@@ -1565,7 +1583,7 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_
+       * Within each group, ciphers remain sorted by strength and previous
+       * preference, i.e.,
+       * 1) ECDHE > DHE
+@@ -55,7 +55,7 @@ Signed-off-by: Eneas U de Queiroz <cote2004-github@yahoo.com>
+       * 3) AES > rest
+       * 4) TLS 1.2 > legacy
+       *
+-@@ -2235,7 +2253,13 @@ const char *OSSL_default_cipher_list(voi
++@@ -2236,7 +2254,13 @@ const char *OSSL_default_cipher_list(voi
+   */
+  const char *OSSL_default_ciphersuites(void)
+  {

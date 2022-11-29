@@ -1,0 +1,226 @@
+From 06efc8027fb5066e818d9b4fd66a3c268c04dea4 Mon Sep 17 00:00:00 2001
+From: John Audia <therealgraysky@proton.me>
+Date: Fri, 20 Oct 2023 10:27:12 -0400
+Subject: [PATCH] kernel: bump 5.15 to 5.15.136
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Changelog: https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.136
+
+Removed bcm53xx patch backported from 5.15.136:
+	target/linux/bcm53xx/patches-5.15/081-xhci-Keep-interrupt-disabled-in-initialization-until.patch [1]
+
+All other patches automatically rebased.
+
+Build system: x86_64
+Build-tested: ramips/tplink_archer-a6-v3
+Run-tested: ramips/tplink_archer-a6-v3
+
+1. https://github.com/openwrt/openwrt/pull/13751#issuecomment-1781206937
+
+Signed-off-by: John Audia <therealgraysky@proton.me>
+[rmilecki: updated commit description & tested on Luxul XWR-3150]
+Signed-off-by: Rafał Miłecki <rafal@milecki.pl>
+[Refreshed on top of OpenWrt 23.05]
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+(cherry picked from commit 5a6368e85deb1d751238447ea8b289576e701cb0)
+---
+ include/kernel-5.15                           |  4 +-
+ .../950-0064-Add-dwc_otg-driver.patch         |  2 +-
+ ...ware-emulation-of-deprecated-instruc.patch |  4 +-
+ ...hci_fixup_endpoint-for-interval-adju.patch |  4 +-
+ ...vice-quirks-for-A4Tech-FHD-1080p-web.patch |  2 +-
+ ...t-TRBS_PER_SEGMENT-define-in-runtime.patch |  4 +-
+ ...upt-disabled-in-initialization-until.patch | 87 -------------------
+ 7 files changed, 10 insertions(+), 97 deletions(-)
+ delete mode 100644 target/linux/bcm53xx/patches-5.15/081-xhci-Keep-interrupt-disabled-in-initialization-until.patch
+
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 313e735a5430a..3806ef18b4781 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .135
+-LINUX_KERNEL_HASH-5.15.135 = 14835e629e237f136cfed484fdb533c95242429809bdcdb2a2d66dfcb7447170
++LINUX_VERSION-5.15 = .136
++LINUX_KERNEL_HASH-5.15.136 = c624b9fe7ee4708d34cfd0b7ebc58037afac7463338cc498641ea31c55eeacb8
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0064-Add-dwc_otg-driver.patch b/target/linux/bcm27xx/patches-5.15/950-0064-Add-dwc_otg-driver.patch
+index aabb741503542..49283f55630e7 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0064-Add-dwc_otg-driver.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0064-Add-dwc_otg-driver.patch
+@@ -1123,7 +1123,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.org>
+  }
+ --- a/drivers/usb/core/hub.c
+ +++ b/drivers/usb/core/hub.c
+-@@ -5640,7 +5640,7 @@ static void port_event(struct usb_hub *h
++@@ -5659,7 +5659,7 @@ static void port_event(struct usb_hub *h
+  		port_dev->over_current_count++;
+  		port_over_current_notify(port_dev);
+  
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0090-ARM64-Force-hardware-emulation-of-deprecated-instruc.patch b/target/linux/bcm27xx/patches-5.15/950-0090-ARM64-Force-hardware-emulation-of-deprecated-instruc.patch
+index 3ab51b0f07cc6..33d3e3b7b6d9a 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0090-ARM64-Force-hardware-emulation-of-deprecated-instruc.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0090-ARM64-Force-hardware-emulation-of-deprecated-instruc.patch
+@@ -10,9 +10,9 @@ Subject: [PATCH] ARM64: Force hardware emulation of deprecated
+ 
+ --- a/arch/arm64/kernel/armv8_deprecated.c
+ +++ b/arch/arm64/kernel/armv8_deprecated.c
+-@@ -183,10 +183,15 @@ static void __init register_insn_emulati
++@@ -546,10 +546,15 @@ static void __init register_insn_emulati
+  
+- 	switch (ops->status) {
++ 	switch (insn->status) {
+  	case INSN_DEPRECATED:
+ +#if 0
+  		insn->current_mode = INSN_EMULATE;
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0152-xhci-implement-xhci_fixup_endpoint-for-interval-adju.patch b/target/linux/bcm27xx/patches-5.15/950-0152-xhci-implement-xhci_fixup_endpoint-for-interval-adju.patch
+index f832fa126c319..c1952de661f81 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0152-xhci-implement-xhci_fixup_endpoint-for-interval-adju.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0152-xhci-implement-xhci_fixup_endpoint-for-interval-adju.patch
+@@ -15,7 +15,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.org>
+ 
+ --- a/drivers/usb/host/xhci.c
+ +++ b/drivers/usb/host/xhci.c
+-@@ -1622,6 +1622,109 @@ command_cleanup:
++@@ -1631,6 +1631,109 @@ command_cleanup:
+  }
+  
+  /*
+@@ -125,7 +125,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.org>
+   * non-error returns are a promise to giveback() the urb later
+   * we drop ownership so next owner (or urb unlink) can get it
+   */
+-@@ -5461,6 +5564,7 @@ static const struct hc_driver xhci_hc_dr
++@@ -5470,6 +5573,7 @@ static const struct hc_driver xhci_hc_dr
+  	.endpoint_reset =	xhci_endpoint_reset,
+  	.check_bandwidth =	xhci_check_bandwidth,
+  	.reset_bandwidth =	xhci_reset_bandwidth,
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0470-sound-usb-add-device-quirks-for-A4Tech-FHD-1080p-web.patch b/target/linux/bcm27xx/patches-5.15/950-0470-sound-usb-add-device-quirks-for-A4Tech-FHD-1080p-web.patch
+index d8ee96258d73d..6dc533b3fe0b1 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0470-sound-usb-add-device-quirks-for-A4Tech-FHD-1080p-web.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0470-sound-usb-add-device-quirks-for-A4Tech-FHD-1080p-web.patch
+@@ -16,7 +16,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.com>
+ 
+ --- a/sound/usb/quirks.c
+ +++ b/sound/usb/quirks.c
+-@@ -1884,6 +1884,8 @@ static const struct usb_audio_quirk_flag
++@@ -1888,6 +1888,8 @@ static const struct usb_audio_quirk_flag
+  		   QUIRK_FLAG_GENERIC_IMPLICIT_FB),
+  	DEVICE_FLG(0x2b53, 0x0031, /* Fiero SC-01 (firmware v1.1.0) */
+  		   QUIRK_FLAG_GENERIC_IMPLICIT_FB),
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0605-xhci-refactor-out-TRBS_PER_SEGMENT-define-in-runtime.patch b/target/linux/bcm27xx/patches-5.15/950-0605-xhci-refactor-out-TRBS_PER_SEGMENT-define-in-runtime.patch
+index 792f3bdf0fe76..917e324a00102 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0605-xhci-refactor-out-TRBS_PER_SEGMENT-define-in-runtime.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0605-xhci-refactor-out-TRBS_PER_SEGMENT-define-in-runtime.patch
+@@ -226,7 +226,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.com>
+  	}
+ --- a/drivers/usb/host/xhci.c
+ +++ b/drivers/usb/host/xhci.c
+-@@ -880,8 +880,8 @@ static void xhci_clear_command_ring(stru
++@@ -889,8 +889,8 @@ static void xhci_clear_command_ring(stru
+  	seg = ring->deq_seg;
+  	do {
+  		memset(seg->trbs, 0,
+@@ -237,7 +237,7 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.com>
+  			cpu_to_le32(~TRB_CYCLE);
+  		seg = seg->next;
+  	} while (seg != ring->deq_seg);
+-@@ -892,7 +892,7 @@ static void xhci_clear_command_ring(stru
++@@ -901,7 +901,7 @@ static void xhci_clear_command_ring(stru
+  	ring->enq_seg = ring->deq_seg;
+  	ring->enqueue = ring->dequeue;
+  
+diff --git a/target/linux/bcm53xx/patches-5.15/081-xhci-Keep-interrupt-disabled-in-initialization-until.patch b/target/linux/bcm53xx/patches-5.15/081-xhci-Keep-interrupt-disabled-in-initialization-until.patch
+deleted file mode 100644
+index 78b3aa85e3b57..0000000000000
+--- a/target/linux/bcm53xx/patches-5.15/081-xhci-Keep-interrupt-disabled-in-initialization-until.patch
++++ /dev/null
+@@ -1,87 +0,0 @@
+-From a808925075fb750804a60ff0710614466c396db4 Mon Sep 17 00:00:00 2001
+-From: Hongyu Xie <xy521521@gmail.com>
+-Date: Thu, 23 Jun 2022 14:19:42 +0300
+-Subject: [PATCH] xhci: Keep interrupt disabled in initialization until host is
+- running.
+-
+-irq is disabled in xhci_quiesce(called by xhci_halt, with bit:2 cleared
+-in USBCMD register), but xhci_run(called by usb_add_hcd) re-enable it.
+-It's possible that you will receive thousands of interrupt requests
+-after initialization for 2.0 roothub. And you will get a lot of
+-warning like, "xHCI dying, ignoring interrupt. Shouldn't IRQs be
+-disabled?". This amount of interrupt requests will cause the entire
+-system to freeze.
+-This problem was first found on a device with ASM2142 host controller
+-on it.
+-
+-[tidy up old code while moving it, reword header -Mathias]
+-
+-Cc: stable@kernel.org
+-Signed-off-by: Hongyu Xie <xiehongyu1@kylinos.cn>
+-Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+-Link: https://lore.kernel.org/r/20220623111945.1557702-2-mathias.nyman@linux.intel.com
+-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+----
+- drivers/usb/host/xhci.c | 35 ++++++++++++++++++++++-------------
+- 1 file changed, 22 insertions(+), 13 deletions(-)
+-
+---- a/drivers/usb/host/xhci.c
+-+++ b/drivers/usb/host/xhci.c
+-@@ -611,8 +611,27 @@ static int xhci_init(struct usb_hcd *hcd
+- 
+- static int xhci_run_finished(struct xhci_hcd *xhci)
+- {
+-+	unsigned long	flags;
+-+	u32		temp;
+-+
+-+	/*
+-+	 * Enable interrupts before starting the host (xhci 4.2 and 5.5.2).
+-+	 * Protect the short window before host is running with a lock
+-+	 */
+-+	spin_lock_irqsave(&xhci->lock, flags);
+-+
+-+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Enable interrupts");
+-+	temp = readl(&xhci->op_regs->command);
+-+	temp |= (CMD_EIE);
+-+	writel(temp, &xhci->op_regs->command);
+-+
+-+	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Enable primary interrupter");
+-+	temp = readl(&xhci->ir_set->irq_pending);
+-+	writel(ER_IRQ_ENABLE(temp), &xhci->ir_set->irq_pending);
+-+
+- 	if (xhci_start(xhci)) {
+- 		xhci_halt(xhci);
+-+		spin_unlock_irqrestore(&xhci->lock, flags);
+- 		return -ENODEV;
+- 	}
+- 	xhci->shared_hcd->state = HC_STATE_RUNNING;
+-@@ -623,6 +642,9 @@ static int xhci_run_finished(struct xhci
+- 
+- 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+- 			"Finished xhci_run for USB3 roothub");
+-+
+-+	spin_unlock_irqrestore(&xhci->lock, flags);
+-+
+- 	return 0;
+- }
+- 
+-@@ -671,19 +693,6 @@ int xhci_run(struct usb_hcd *hcd)
+- 	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
+- 	writel(temp, &xhci->ir_set->irq_control);
+- 
+--	/* Set the HCD state before we enable the irqs */
+--	temp = readl(&xhci->op_regs->command);
+--	temp |= (CMD_EIE);
+--	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+--			"// Enable interrupts, cmd = 0x%x.", temp);
+--	writel(temp, &xhci->op_regs->command);
+--
+--	temp = readl(&xhci->ir_set->irq_pending);
+--	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+--			"// Enabling event ring interrupter %p by writing 0x%x to irq_pending",
+--			xhci->ir_set, (unsigned int) ER_IRQ_ENABLE(temp));
+--	writel(ER_IRQ_ENABLE(temp), &xhci->ir_set->irq_pending);
+--
+- 	if (xhci->quirks & XHCI_NEC_HOST) {
+- 		struct xhci_command *command;
+- 

@@ -1,0 +1,34 @@
+From af22a169c1e480b991eb8c4e69674bf5846d6215 Mon Sep 17 00:00:00 2001
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 18 Nov 2023 16:29:09 +0100
+Subject: [PATCH] dnsmasq: mark global ubus context as closed after fork
+
+If the dnsmasq process forks to handle TCP connections, it closes the ubus
+context. But instead of changing the daemon wide pointer to NULL, only the
+local variable was adjusted - and this portion of the code was even dropped
+(dead store) by some optimizing compilers.
+
+It makes more sense to change the daemon->ubus pointer because various
+functions are already checking it for NULL. It is also the behavior which
+ubus_destroy() implements.
+
+Fixes: d8b33dad0bb7 ("dnsmasq: add support for monitoring and modifying dns lookup results via ubus")
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+(cherry picked from commit 711dcb77630e96e75413b5cdbe3ddb5432f394f6)
+---
+ package/network/services/dnsmasq/patches/200-ubus_dns.patch | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/network/services/dnsmasq/patches/200-ubus_dns.patch b/package/network/services/dnsmasq/patches/200-ubus_dns.patch
+index 8a70bb8bdf19b..ccbe70ab9c3ce 100644
+--- a/package/network/services/dnsmasq/patches/200-ubus_dns.patch
++++ b/package/network/services/dnsmasq/patches/200-ubus_dns.patch
+@@ -210,7 +210,7 @@
+ +    return;
+ +
+ +  ubus_free(ubus);
+-+  ubus = NULL;
+++  daemon->ubus = NULL;
+ +}
+ +
+  static int ubus_handle_metrics(struct ubus_context *ctx, struct ubus_object *obj,
