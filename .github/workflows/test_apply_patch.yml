@@ -1,0 +1,67 @@
+# Build OpenWrt using GitHub Actions
+
+name: test apply patches
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt.git
+  REPO_BRANCH: openwrt-21.02
+  REPO_BRANCH_VER: 21.02.5
+  REPO_TAG: v21.02.5
+  VERMAGIC: 8bf2c37fddb5d4bb9e3ca54818bf5e18
+  ARCH_PACKAGES: mips_24kc
+  REPO_DEPTH: 0
+  FEEDS_CONF: feeds.conf.21025
+  CONFIG_FILE: .config_ath79
+  FILES_PATH: files
+  PATCHES_PATH: patches
+  UPLOAD_RELEASE: true
+  TZ: UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+      with:
+        fetch-depth: 1
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install build-essential ccache ecj fastjar file g++ gawk \
+        gettext git java-propose-classpath libelf-dev libncurses5-dev \
+        libncursesw5-dev libssl-dev python python2.7-dev python3 unzip wget \
+        python3-distutils python3-setuptools python3-dev rsync subversion \
+        swig time xsltproc zlib1g-dev libboost-dev zip
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        [ $REPO_DEPTH -ge 1 ] && git clone --depth $REPO_DEPTH --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Apply patches
+      run: |
+        [ -d $PATCHES_PATH ] && mv $PATCHES_PATH openwrt/$PATCHES_PATH
+        cd openwrt
+        wget https://github.com/openwrt/openwrt/commit/9cec59ca38a3600f175bd12e0620a1c7306aa813.patch
+        wget https://github.com/openwrt/openwrt/commit/3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        git apply --check 9cec59ca38a3600f175bd12e0620a1c7306aa813.patch
+        sed -i 's/842/840/g' 3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        git apply --check 3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
+        git status -s
+
