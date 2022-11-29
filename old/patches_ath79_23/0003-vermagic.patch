@@ -1,0 +1,26 @@
+diff --git a/include/kernel-defaults.mk b/include/kernel-defaults.mk
+index cc1e2361be..35ffc1fbba 100644
+--- a/include/kernel-defaults.mk
++++ b/include/kernel-defaults.mk
+@@ -105,7 +105,7 @@ define Kernel/Configure/Default
+ 		cp $(LINUX_DIR)/.config.set $(LINUX_DIR)/.config.prev; \
+ 	}
+ 	$(_SINGLE) [ -d $(LINUX_DIR)/user_headers ] || $(KERNEL_MAKE) $(if $(findstring uml,$(BOARD)),ARCH=$(ARCH)) INSTALL_HDR_PATH=$(LINUX_DIR)/user_headers headers_install
+-	grep '=[ym]' $(LINUX_DIR)/.config.set | LC_ALL=C sort | $(MKHASH) md5 > $(LINUX_DIR)/.vermagic
++	cp $(TOPDIR)/vermagic $(LINUX_DIR)/.vermagic
+ endef
+ 
+ define Kernel/Configure/Initramfs
+ diff --git a/package/kernel/linux/Makefile b/package/kernel/linux/Makefile
+index 39b9e82c27..6ff64b2939 100644
+--- a/package/kernel/linux/Makefile
++++ b/package/kernel/linux/Makefile
+@@ -24,7 +24,7 @@ export SHELL:=/bin/sh
+ include $(INCLUDE_DIR)/package.mk
+ 
+ ifeq ($(DUMP),)
+-  STAMP_BUILT:=$(STAMP_BUILT)_$(shell $(SCRIPT_DIR)/kconfig.pl $(LINUX_DIR)/.config | $(MKHASH) md5)
++  STAMP_BUILT:=$(STAMP_BUILT)_$(shell cat $(LINUX_DIR)/.vermagic)
+   -include $(LINUX_DIR)/.config
+ endif
+ 
