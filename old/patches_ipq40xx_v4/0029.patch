@@ -1,0 +1,388 @@
+From 64ab02aff86839dad65d97d38ed302c73b22ad40 Mon Sep 17 00:00:00 2001
+From: John Audia <therealgraysky@proton.me>
+Date: Wed, 25 Oct 2023 15:26:53 -0400
+Subject: [PATCH] kernel: bump 5.15 to 5.15.137
+
+Changelog: https://cdn.kernel.org/pub/linux/kernel/v5.x/ChangeLog-5.15.137
+
+All patches automatically rebased.
+
+Build system: x86_64
+Build-tested: ramips/tplink_archer-a6-v3
+Run-tested: ramips/tplink_archer-a6-v3
+
+Signed-off-by: John Audia <therealgraysky@proton.me>
+[Refreshed on top of OpenWrt 23.05]
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+(cherry picked from commit 75aeb7ed627ba5ea6f10f365b232bed21e40b502)
+---
+ include/kernel-5.15                           |  4 ++--
+ ...-fixup-modes-that-haven-t-been-reset.patch |  2 +-
+ ...rs-remove-legacy_cursor_update-hacks.patch |  4 ++--
+ ...dsa-bcm_sf2-refactor-LED-regs-access.patch |  2 +-
+ ...m_sf2-enable-GPHY-for-switch-probing.patch |  2 +-
+ ...sf2-keep-GPHY-enabled-on-the-BCM4908.patch |  2 +-
+ ..._eth_soc-implement-flow-offloading-t.patch |  2 +-
+ ...-users-of-bitmap_foo-to-linkmode_foo.patch |  4 ++--
+ ...ive-renaming-when-an-interface-is-up.patch |  4 ++--
+ .../721-net-add-packet-mangeling.patch        |  2 +-
+ .../780-usb-net-MeigLink_modem_support.patch  |  4 ++--
+ .../generic/hack-5.15/902-debloat_proc.patch  |  4 ++--
+ ...ng-with-source-address-failed-policy.patch |  2 +-
+ ...T-skip-GRO-for-foreign-MAC-addresses.patch | 10 +++++-----
+ ...ional-threading-for-backlog-processi.patch | 20 +++++++++----------
+ 15 files changed, 34 insertions(+), 34 deletions(-)
+
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 3806ef18b4781..47db849241d26 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .136
+-LINUX_KERNEL_HASH-5.15.136 = c624b9fe7ee4708d34cfd0b7ebc58037afac7463338cc498641ea31c55eeacb8
++LINUX_VERSION-5.15 = .137
++LINUX_KERNEL_HASH-5.15.137 = 9749b21609f9e7ad9c46160c2c107db823b99cef77fa6cb080b6c2dc685fb2f7
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0439-drm-atomic-Don-t-fixup-modes-that-haven-t-been-reset.patch b/target/linux/bcm27xx/patches-5.15/950-0439-drm-atomic-Don-t-fixup-modes-that-haven-t-been-reset.patch
+index 657e3969a6392..96a92663bddf2 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0439-drm-atomic-Don-t-fixup-modes-that-haven-t-been-reset.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0439-drm-atomic-Don-t-fixup-modes-that-haven-t-been-reset.patch
+@@ -10,7 +10,7 @@ Signed-off-by: Dave Stevenson <dave.stevenson@raspberrypi.com>
+ 
+ --- a/drivers/gpu/drm/drm_atomic_helper.c
+ +++ b/drivers/gpu/drm/drm_atomic_helper.c
+-@@ -431,6 +431,11 @@ mode_fixup(struct drm_atomic_state *stat
++@@ -436,6 +436,11 @@ mode_fixup(struct drm_atomic_state *stat
+  		new_crtc_state =
+  			drm_atomic_get_new_crtc_state(state, new_conn_state->crtc);
+  
+diff --git a/target/linux/bcm27xx/patches-5.15/950-0806-drm-atomic-helpers-remove-legacy_cursor_update-hacks.patch b/target/linux/bcm27xx/patches-5.15/950-0806-drm-atomic-helpers-remove-legacy_cursor_update-hacks.patch
+index bfcbbe153b93d..c5380469e9b43 100644
+--- a/target/linux/bcm27xx/patches-5.15/950-0806-drm-atomic-helpers-remove-legacy_cursor_update-hacks.patch
++++ b/target/linux/bcm27xx/patches-5.15/950-0806-drm-atomic-helpers-remove-legacy_cursor_update-hacks.patch
+@@ -59,7 +59,7 @@ Signed-off-by: Maxime Ripard <maxime@cerno.tech>
+ 
+ --- a/drivers/gpu/drm/drm_atomic_helper.c
+ +++ b/drivers/gpu/drm/drm_atomic_helper.c
+-@@ -1507,13 +1507,6 @@ drm_atomic_helper_wait_for_vblanks(struc
++@@ -1516,13 +1516,6 @@ drm_atomic_helper_wait_for_vblanks(struc
+  	int i, ret;
+  	unsigned int crtc_mask = 0;
+  
+@@ -73,7 +73,7 @@ Signed-off-by: Maxime Ripard <maxime@cerno.tech>
+  	for_each_oldnew_crtc_in_state(old_state, crtc, old_crtc_state, new_crtc_state, i) {
+  		if (!new_crtc_state->active)
+  			continue;
+-@@ -2141,12 +2134,6 @@ int drm_atomic_helper_setup_commit(struc
++@@ -2150,12 +2143,6 @@ int drm_atomic_helper_setup_commit(struc
+  			complete_all(&commit->flip_done);
+  			continue;
+  		}
+diff --git a/target/linux/bcm4908/patches-5.15/070-v5.17-net-dsa-bcm_sf2-refactor-LED-regs-access.patch b/target/linux/bcm4908/patches-5.15/070-v5.17-net-dsa-bcm_sf2-refactor-LED-regs-access.patch
+index fd0b13c17ba95..e01c1e4728bd3 100644
+--- a/target/linux/bcm4908/patches-5.15/070-v5.17-net-dsa-bcm_sf2-refactor-LED-regs-access.patch
++++ b/target/linux/bcm4908/patches-5.15/070-v5.17-net-dsa-bcm_sf2-refactor-LED-regs-access.patch
+@@ -82,7 +82,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+  	}
+  }
+  
+-@@ -1241,9 +1278,14 @@ static const u16 bcm_sf2_4908_reg_offset
++@@ -1247,9 +1284,14 @@ static const u16 bcm_sf2_4908_reg_offset
+  	[REG_SPHY_CNTRL]	= 0x24,
+  	[REG_CROSSBAR]		= 0xc8,
+  	[REG_RGMII_11_CNTRL]	= 0x014c,
+diff --git a/target/linux/bcm4908/patches-5.15/700-net-dsa-bcm_sf2-enable-GPHY-for-switch-probing.patch b/target/linux/bcm4908/patches-5.15/700-net-dsa-bcm_sf2-enable-GPHY-for-switch-probing.patch
+index ba09c562aebae..165b02da0fa32 100644
+--- a/target/linux/bcm4908/patches-5.15/700-net-dsa-bcm_sf2-enable-GPHY-for-switch-probing.patch
++++ b/target/linux/bcm4908/patches-5.15/700-net-dsa-bcm_sf2-enable-GPHY-for-switch-probing.patch
+@@ -29,7 +29,7 @@ Signed-off-by: Rafał Miłecki <rafal@milecki.pl>
+ 
+ --- a/drivers/net/dsa/bcm_sf2.c
+ +++ b/drivers/net/dsa/bcm_sf2.c
+-@@ -1542,10 +1542,14 @@ static int bcm_sf2_sw_probe(struct platf
++@@ -1548,10 +1548,14 @@ static int bcm_sf2_sw_probe(struct platf
+  	rev = reg_readl(priv, REG_PHY_REVISION);
+  	priv->hw_params.gphy_rev = rev & PHY_REVISION_MASK;
+  
+diff --git a/target/linux/bcm4908/patches-5.15/701-net-dsa-bcm_sf2-keep-GPHY-enabled-on-the-BCM4908.patch b/target/linux/bcm4908/patches-5.15/701-net-dsa-bcm_sf2-keep-GPHY-enabled-on-the-BCM4908.patch
+index b5baa8717e4aa..ea0adca26f6c7 100644
+--- a/target/linux/bcm4908/patches-5.15/701-net-dsa-bcm_sf2-keep-GPHY-enabled-on-the-BCM4908.patch
++++ b/target/linux/bcm4908/patches-5.15/701-net-dsa-bcm_sf2-keep-GPHY-enabled-on-the-BCM4908.patch
+@@ -15,7 +15,7 @@ Signed-off-by: Rafał Miłecki <rafal@milecki.pl>
+ 
+ --- a/drivers/net/dsa/bcm_sf2.c
+ +++ b/drivers/net/dsa/bcm_sf2.c
+-@@ -1556,6 +1556,12 @@ static int bcm_sf2_sw_probe(struct platf
++@@ -1562,6 +1562,12 @@ static int bcm_sf2_sw_probe(struct platf
+  		 priv->hw_params.core_rev >> 8, priv->hw_params.core_rev & 0xff,
+  		 priv->irq0, priv->irq1);
+  
+diff --git a/target/linux/generic/backport-5.15/702-v5.19-03-net-ethernet-mtk_eth_soc-implement-flow-offloading-t.patch b/target/linux/generic/backport-5.15/702-v5.19-03-net-ethernet-mtk_eth_soc-implement-flow-offloading-t.patch
+index ef2f53aa3847d..69113c2ffafc6 100644
+--- a/target/linux/generic/backport-5.15/702-v5.19-03-net-ethernet-mtk_eth_soc-implement-flow-offloading-t.patch
++++ b/target/linux/generic/backport-5.15/702-v5.19-03-net-ethernet-mtk_eth_soc-implement-flow-offloading-t.patch
+@@ -256,7 +256,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  
+ --- a/net/core/dev.c
+ +++ b/net/core/dev.c
+-@@ -763,6 +763,10 @@ int dev_fill_forward_path(const struct n
++@@ -769,6 +769,10 @@ int dev_fill_forward_path(const struct n
+  		if (WARN_ON_ONCE(last_dev == ctx.dev))
+  			return -1;
+  	}
+diff --git a/target/linux/generic/backport-5.15/703-00-v5.16-net-convert-users-of-bitmap_foo-to-linkmode_foo.patch b/target/linux/generic/backport-5.15/703-00-v5.16-net-convert-users-of-bitmap_foo-to-linkmode_foo.patch
+index 2f8128b3f3055..284a6d072255e 100644
+--- a/target/linux/generic/backport-5.15/703-00-v5.16-net-convert-users-of-bitmap_foo-to-linkmode_foo.patch
++++ b/target/linux/generic/backport-5.15/703-00-v5.16-net-convert-users-of-bitmap_foo-to-linkmode_foo.patch
+@@ -304,7 +304,7 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
+  }
+ --- a/drivers/net/dsa/bcm_sf2.c
+ +++ b/drivers/net/dsa/bcm_sf2.c
+-@@ -686,7 +686,7 @@ static void bcm_sf2_sw_validate(struct d
++@@ -692,7 +692,7 @@ static void bcm_sf2_sw_validate(struct d
+  	    state->interface != PHY_INTERFACE_MODE_GMII &&
+  	    state->interface != PHY_INTERFACE_MODE_INTERNAL &&
+  	    state->interface != PHY_INTERFACE_MODE_MOCA) {
+@@ -313,7 +313,7 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
+  		if (port != core_readl(priv, CORE_IMP0_PRT_ID))
+  			dev_err(ds->dev,
+  				"Unsupported interface: %d for port %d\n",
+-@@ -714,10 +714,8 @@ static void bcm_sf2_sw_validate(struct d
++@@ -720,10 +720,8 @@ static void bcm_sf2_sw_validate(struct d
+  	phylink_set(mask, 100baseT_Half);
+  	phylink_set(mask, 100baseT_Full);
+  
+diff --git a/target/linux/generic/backport-5.15/794-v6.2-net-core-Allow-live-renaming-when-an-interface-is-up.patch b/target/linux/generic/backport-5.15/794-v6.2-net-core-Allow-live-renaming-when-an-interface-is-up.patch
+index bd58db2e7787e..582e1ce2efdd4 100644
+--- a/target/linux/generic/backport-5.15/794-v6.2-net-core-Allow-live-renaming-when-an-interface-is-up.patch
++++ b/target/linux/generic/backport-5.15/794-v6.2-net-core-Allow-live-renaming-when-an-interface-is-up.patch
+@@ -73,7 +73,7 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
+  /* Specifies the type of the struct net_device::ml_priv pointer */
+ --- a/net/core/dev.c
+ +++ b/net/core/dev.c
+-@@ -1222,22 +1222,6 @@ int dev_change_name(struct net_device *d
++@@ -1242,22 +1242,6 @@ int dev_change_name(struct net_device *d
+  
+  	net = dev_net(dev);
+  
+@@ -96,7 +96,7 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
+  	down_write(&devnet_rename_sem);
+  
+  	if (strncmp(newname, dev->name, IFNAMSIZ) == 0) {
+-@@ -1254,7 +1238,8 @@ int dev_change_name(struct net_device *d
++@@ -1274,7 +1258,8 @@ int dev_change_name(struct net_device *d
+  	}
+  
+  	if (oldname[0] && !strchr(oldname, '%'))
+diff --git a/target/linux/generic/hack-5.15/721-net-add-packet-mangeling.patch b/target/linux/generic/hack-5.15/721-net-add-packet-mangeling.patch
+index fcaed01cad194..ac9a161b5f591 100644
+--- a/target/linux/generic/hack-5.15/721-net-add-packet-mangeling.patch
++++ b/target/linux/generic/hack-5.15/721-net-add-packet-mangeling.patch
+@@ -116,7 +116,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	help
+ --- a/net/core/dev.c
+ +++ b/net/core/dev.c
+-@@ -3577,6 +3577,11 @@ static int xmit_one(struct sk_buff *skb,
++@@ -3597,6 +3597,11 @@ static int xmit_one(struct sk_buff *skb,
+  	if (dev_nit_active(dev))
+  		dev_queue_xmit_nit(skb, dev);
+  
+diff --git a/target/linux/generic/hack-5.15/780-usb-net-MeigLink_modem_support.patch b/target/linux/generic/hack-5.15/780-usb-net-MeigLink_modem_support.patch
+index 5c1dbd69d3cdc..e5667c17438d2 100644
+--- a/target/linux/generic/hack-5.15/780-usb-net-MeigLink_modem_support.patch
++++ b/target/linux/generic/hack-5.15/780-usb-net-MeigLink_modem_support.patch
+@@ -20,7 +20,7 @@ Subject: [PATCH] net/usb/qmi_wwan: add MeigLink modem support
+  	{QMI_FIXED_INTF(0x0408, 0xea42, 4)},	/* Yota / Megafon M100-1 */
+ --- a/drivers/usb/serial/option.c
+ +++ b/drivers/usb/serial/option.c
+-@@ -244,6 +244,8 @@ static void option_instat_callback(struc
++@@ -247,6 +247,8 @@ static void option_instat_callback(struc
+  #define UBLOX_PRODUCT_R410M			0x90b2
+  /* These Yuga products use Qualcomm's vendor ID */
+  #define YUGA_PRODUCT_CLM920_NC5			0x9625
+@@ -29,7 +29,7 @@ Subject: [PATCH] net/usb/qmi_wwan: add MeigLink modem support
+  
+  #define QUECTEL_VENDOR_ID			0x2c7c
+  /* These Quectel products use Quectel's vendor ID */
+-@@ -1180,6 +1182,11 @@ static const struct usb_device_id option
++@@ -1185,6 +1187,11 @@ static const struct usb_device_id option
+  	  .driver_info = ZLP },
+  	{ USB_DEVICE(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_BG96),
+  	  .driver_info = RSVD(4) },
+diff --git a/target/linux/generic/hack-5.15/902-debloat_proc.patch b/target/linux/generic/hack-5.15/902-debloat_proc.patch
+index 58c2026c48e2c..768d3e1f0cfb7 100644
+--- a/target/linux/generic/hack-5.15/902-debloat_proc.patch
++++ b/target/linux/generic/hack-5.15/902-debloat_proc.patch
+@@ -341,7 +341,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  
+ --- a/net/ipv4/fib_trie.c
+ +++ b/net/ipv4/fib_trie.c
+-@@ -3025,11 +3025,13 @@ static const struct seq_operations fib_r
++@@ -3029,11 +3029,13 @@ static const struct seq_operations fib_r
+  
+  int __net_init fib_proc_init(struct net *net)
+  {
+@@ -357,7 +357,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  			fib_triestat_seq_show, NULL))
+  		goto out2;
+  
+-@@ -3040,17 +3042,21 @@ int __net_init fib_proc_init(struct net
++@@ -3044,17 +3046,21 @@ int __net_init fib_proc_init(struct net
+  	return 0;
+  
+  out3:
+diff --git a/target/linux/generic/pending-5.15/670-ipv6-allow-rejecting-with-source-address-failed-policy.patch b/target/linux/generic/pending-5.15/670-ipv6-allow-rejecting-with-source-address-failed-policy.patch
+index 351d5864a1f8b..7aaac9653187b 100644
+--- a/target/linux/generic/pending-5.15/670-ipv6-allow-rejecting-with-source-address-failed-policy.patch
++++ b/target/linux/generic/pending-5.15/670-ipv6-allow-rejecting-with-source-address-failed-policy.patch
+@@ -66,7 +66,7 @@ Signed-off-by: Jonas Gorski <jogo@openwrt.org>
+  static void rt_fibinfo_free(struct rtable __rcu **rtp)
+ --- a/net/ipv4/fib_trie.c
+ +++ b/net/ipv4/fib_trie.c
+-@@ -2773,6 +2773,7 @@ static const char *const rtn_type_names[
++@@ -2777,6 +2777,7 @@ static const char *const rtn_type_names[
+  	[RTN_THROW] = "THROW",
+  	[RTN_NAT] = "NAT",
+  	[RTN_XRESOLVE] = "XRESOLVE",
+diff --git a/target/linux/generic/pending-5.15/680-NET-skip-GRO-for-foreign-MAC-addresses.patch b/target/linux/generic/pending-5.15/680-NET-skip-GRO-for-foreign-MAC-addresses.patch
+index 71b3aac846967..46856e1552fa0 100644
+--- a/target/linux/generic/pending-5.15/680-NET-skip-GRO-for-foreign-MAC-addresses.patch
++++ b/target/linux/generic/pending-5.15/680-NET-skip-GRO-for-foreign-MAC-addresses.patch
+@@ -32,7 +32,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	__u8			inner_protocol_type:1;
+ --- a/net/core/dev.c
+ +++ b/net/core/dev.c
+-@@ -6054,6 +6054,9 @@ static enum gro_result dev_gro_receive(s
++@@ -6074,6 +6074,9 @@ static enum gro_result dev_gro_receive(s
+  	int same_flow;
+  	int grow;
+  
+@@ -42,7 +42,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	if (netif_elide_gro(skb->dev))
+  		goto normal;
+  
+-@@ -8068,6 +8071,48 @@ static void __netdev_adjacent_dev_unlink
++@@ -8088,6 +8091,48 @@ static void __netdev_adjacent_dev_unlink
+  					   &upper_dev->adj_list.lower);
+  }
+  
+@@ -91,7 +91,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  static int __netdev_upper_dev_link(struct net_device *dev,
+  				   struct net_device *upper_dev, bool master,
+  				   void *upper_priv, void *upper_info,
+-@@ -8119,6 +8164,7 @@ static int __netdev_upper_dev_link(struc
++@@ -8139,6 +8184,7 @@ static int __netdev_upper_dev_link(struc
+  	if (ret)
+  		return ret;
+  
+@@ -99,7 +99,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	ret = call_netdevice_notifiers_info(NETDEV_CHANGEUPPER,
+  					    &changeupper_info.info);
+  	ret = notifier_to_errno(ret);
+-@@ -8215,6 +8261,7 @@ static void __netdev_upper_dev_unlink(st
++@@ -8235,6 +8281,7 @@ static void __netdev_upper_dev_unlink(st
+  
+  	__netdev_adjacent_dev_unlink_neighbour(dev, upper_dev);
+  
+@@ -107,7 +107,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	call_netdevice_notifiers_info(NETDEV_CHANGEUPPER,
+  				      &changeupper_info.info);
+  
+-@@ -9034,6 +9081,7 @@ int dev_set_mac_address(struct net_devic
++@@ -9054,6 +9101,7 @@ int dev_set_mac_address(struct net_devic
+  	if (err)
+  		return err;
+  	dev->addr_assign_type = NET_ADDR_SET;
+diff --git a/target/linux/generic/pending-5.15/760-net-core-add-optional-threading-for-backlog-processi.patch b/target/linux/generic/pending-5.15/760-net-core-add-optional-threading-for-backlog-processi.patch
+index 8a65cbe021f7a..62daef91b1506 100644
+--- a/target/linux/generic/pending-5.15/760-net-core-add-optional-threading-for-backlog-processi.patch
++++ b/target/linux/generic/pending-5.15/760-net-core-add-optional-threading-for-backlog-processi.patch
+@@ -20,7 +20,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  
+  /**
+   *	napi_disable - prevent NAPI from scheduling
+-@@ -3362,6 +3363,7 @@ struct softnet_data {
++@@ -3363,6 +3364,7 @@ struct softnet_data {
+  	unsigned int		processed;
+  	unsigned int		time_squeeze;
+  	unsigned int		received_rps;
+@@ -30,7 +30,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  #endif
+ --- a/net/core/dev.c
+ +++ b/net/core/dev.c
+-@@ -4563,7 +4563,7 @@ static int rps_ipi_queued(struct softnet
++@@ -4583,7 +4583,7 @@ static int rps_ipi_queued(struct softnet
+  #ifdef CONFIG_RPS
+  	struct softnet_data *mysd = this_cpu_ptr(&softnet_data);
+  
+@@ -39,7 +39,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  		sd->rps_ipi_next = mysd->rps_ipi_list;
+  		mysd->rps_ipi_list = sd;
+  
+-@@ -5744,6 +5744,8 @@ static DEFINE_PER_CPU(struct work_struct
++@@ -5764,6 +5764,8 @@ static DEFINE_PER_CPU(struct work_struct
+  /* Network device is going away, flush any packets still pending */
+  static void flush_backlog(struct work_struct *work)
+  {
+@@ -48,7 +48,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	struct sk_buff *skb, *tmp;
+  	struct softnet_data *sd;
+  
+-@@ -5759,9 +5761,18 @@ static void flush_backlog(struct work_st
++@@ -5779,9 +5781,18 @@ static void flush_backlog(struct work_st
+  			input_queue_head_incr(sd);
+  		}
+  	}
+@@ -67,7 +67,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  	skb_queue_walk_safe(&sd->process_queue, skb, tmp) {
+  		if (skb->dev->reg_state == NETREG_UNREGISTERING) {
+  			__skb_unlink(skb, &sd->process_queue);
+-@@ -5769,7 +5780,18 @@ static void flush_backlog(struct work_st
++@@ -5789,7 +5800,18 @@ static void flush_backlog(struct work_st
+  			input_queue_head_incr(sd);
+  		}
+  	}
+@@ -86,7 +86,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  }
+  
+  static bool flush_required(int cpu)
+-@@ -6452,6 +6474,7 @@ static int process_backlog(struct napi_s
++@@ -6472,6 +6494,7 @@ static int process_backlog(struct napi_s
+  
+  		local_irq_disable();
+  		rps_lock(sd);
+@@ -94,7 +94,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  		if (skb_queue_empty(&sd->input_pkt_queue)) {
+  			/*
+  			 * Inline a custom version of __napi_complete().
+-@@ -6461,7 +6484,8 @@ static int process_backlog(struct napi_s
++@@ -6481,7 +6504,8 @@ static int process_backlog(struct napi_s
+  			 * We can use a plain write instead of clear_bit(),
+  			 * and we dont need an smp_mb() memory barrier.
+  			 */
+@@ -104,7 +104,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  			again = false;
+  		} else {
+  			skb_queue_splice_tail_init(&sd->input_pkt_queue,
+-@@ -6878,6 +6902,57 @@ int dev_set_threaded(struct net_device *
++@@ -6898,6 +6922,57 @@ int dev_set_threaded(struct net_device *
+  }
+  EXPORT_SYMBOL(dev_set_threaded);
+  
+@@ -162,7 +162,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
+  		    int (*poll)(struct napi_struct *, int), int weight)
+  {
+-@@ -11354,6 +11429,9 @@ static int dev_cpu_dead(unsigned int old
++@@ -11378,6 +11453,9 @@ static int dev_cpu_dead(unsigned int old
+  	raise_softirq_irqoff(NET_TX_SOFTIRQ);
+  	local_irq_enable();
+  
+@@ -172,7 +172,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  #ifdef CONFIG_RPS
+  	remsd = oldsd->rps_ipi_list;
+  	oldsd->rps_ipi_list = NULL;
+-@@ -11693,6 +11771,7 @@ static int __init net_dev_init(void)
++@@ -11717,6 +11795,7 @@ static int __init net_dev_init(void)
+  		sd->cpu = i;
+  #endif
+  
