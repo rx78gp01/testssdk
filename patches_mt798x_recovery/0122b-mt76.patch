@@ -1,0 +1,29 @@
+From bc5d9779dac9a6a8136f5e105d3181f95b64eb74 Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Tue, 21 May 2024 10:10:00 +0200
+Subject: [PATCH] mt76: install mt7981_eeprom_mt7976_dbdc.bin to
+ STAGING_DIR_IMAGE
+
+It will be used in the image building code
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+---
+ package/kernel/mt76/Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/package/kernel/mt76/Makefile b/package/kernel/mt76/Makefile
+index f2339e942a324..03c97de797734 100644
+--- a/package/kernel/mt76/Makefile
++++ b/package/kernel/mt76/Makefile
+@@ -632,6 +632,11 @@ define Package/mt76-test/install
+ 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tools/mt76-test $(1)/usr/sbin
+ endef
+ 
++define Build/InstallDev
++	mkdir -p $(STAGING_DIR_IMAGE)
++	$(CP) $(PKG_BUILD_DIR)/firmware/mt7981_eeprom_mt7976_dbdc.bin $(STAGING_DIR_IMAGE)/
++endef
++
+ $(eval $(call KernelPackage,mt76-core))
+ $(eval $(call KernelPackage,mt76-usb))
+ $(eval $(call KernelPackage,mt76x02-usb))
