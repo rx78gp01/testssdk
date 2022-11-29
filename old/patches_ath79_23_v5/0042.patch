@@ -1,0 +1,23 @@
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 12c886357958f..73639e6b1e684 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .142
+-LINUX_KERNEL_HASH-5.15.142 = 8d76c95277dc5ab0a6cd0069432af2ceb759d0ac2b6f5401330d390196095676
++LINUX_VERSION-5.15 = .146
++LINUX_KERNEL_HASH-5.15.146 = 5a807a5fa2a80ada957d8079681dfb5cc196ec26f43244d1c8a4fd7af592d192
+diff --git a/package/kernel/linux/modules/fs.mk b/package/kernel/linux/modules/fs.mk
+index f2acaa7439845..58af180c28014 100644
+--- a/package/kernel/linux/modules/fs.mk
++++ b/package/kernel/linux/modules/fs.mk
+@@ -359,8 +359,7 @@ define KernelPackage/fs-ksmbd
+   DEPENDS:= \
+ 	  +kmod-nls-base \
+ 	  +kmod-nls-utf8 \
+-	  +kmod-crypto-md4 \
+-          +kmod-crypto-md5 \
++	  +kmod-crypto-md5 \
+ 	  +kmod-crypto-hmac \
+ 	  +kmod-crypto-ecb \
+ 	  +kmod-crypto-des \

@@ -1,0 +1,23 @@
+diff --git a/target/linux/generic/config-5.15 b/target/linux/generic/config-5.15
+index e535609..2ce6e8c 100644
+--- a/target/linux/generic/config-5.15
++++ b/target/linux/generic/config-5.15
+@@ -1099,7 +1099,6 @@ CONFIG_CRYPTO_ALGAPI2=y
+ # CONFIG_CRYPTO_CAST5 is not set
+ # CONFIG_CRYPTO_CAST6 is not set
+ # CONFIG_CRYPTO_CBC is not set
+-CONFIG_CRYPTO_CCM=y
+ # CONFIG_CRYPTO_CFB is not set
+ # CONFIG_CRYPTO_CHACHA20 is not set
+ CONFIG_CRYPTO_CHACHA20POLY1305=y
+@@ -1172,7 +1171,6 @@ CONFIG_CRYPTO_CTR=y
+ # CONFIG_CRYPTO_ESSIV is not set
+ # CONFIG_CRYPTO_FCRYPT is not set
+ # CONFIG_CRYPTO_FIPS is not set
+-CONFIG_CRYPTO_GCM=y
+ CONFIG_CRYPTO_GF128MUL=y
+ CONFIG_CRYPTO_GHASH=y
+ # CONFIG_CRYPTO_GHASH_ARM64_CE is not set
+-- 
+2.38.1.windows.1
+
