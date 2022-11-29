@@ -1,0 +1,91 @@
+From 6be3892dc1abb7b39c2af0123a52335ef0b8a679 Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Sat, 8 Jun 2024 15:40:19 -0700
+Subject: [PATCH] iperf3: update to 3.17.1 and fix usage with big endian
+
+Upstream submissions.
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+(cherry picked from commit 37ade7efabae535bb4612177bc4cf0a32353b8e9)
+---
+ net/iperf3/Makefile                     |  2 +-
+ net/iperf3/patches/010-y2k.patch        | 21 +++++++++++++++++++++
+ net/iperf3/patches/020-big-endian.patch | 21 +++++++++++++++++++++
+ 3 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 net/iperf3/patches/010-y2k.patch
+ create mode 100644 net/iperf3/patches/020-big-endian.patch
+
+diff --git a/feeds/packages/net/iperf3/Makefile b/feeds/packages/net/iperf3/Makefile
+index 2bfe947f2786b..b9824309c4267 100644
+--- a/feeds/packages/net/iperf3/Makefile
++++ b/feeds/packages/net/iperf3/Makefile
+@@ -8,12 +8,12 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=iperf
+-PKG_VERSION:=3.16
+-PKG_RELEASE:=1
++PKG_VERSION:=3.17.1
++PKG_RELEASE:=2
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.es.net/pub/iperf
+-PKG_HASH:=cc740c6bbea104398cc3e466befc515a25896ec85e44a662d5f4a767b9cf713e
++PKG_HASH:=84404ca8431b595e86c473d8f23d8bb102810001f15feaf610effd3b318788aa
+ 
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
+ PKG_LICENSE:=BSD-3-Clause
+diff --git a/feeds/packages/net/iperf3/patches/010-y2k.patch b/feeds/packages/net/iperf3/patches/010-y2k.patch
+new file mode 100644
+index 0000000000000..86350d1ad8185
+--- /dev/null
++++ b/feeds/packages/net/iperf3/patches/010-y2k.patch
+@@ -0,0 +1,21 @@
++From 4c7629f590bb18855e478a826833adb05d2a128b Mon Sep 17 00:00:00 2001
++From: Rosen Penev <rosenp@gmail.com>
++Date: Sat, 8 Jun 2024 15:35:47 -0700
++Subject: [PATCH] fix -Wformat-y2k error
++
++%c potentially prints a 2 digit year. Just use a normal format.
++---
++ src/iperf_error.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++--- a/src/iperf_error.c
+++++ b/src/iperf_error.c
++@@ -99,7 +99,7 @@ iperf_errexit(struct iperf_test *test, c
++     if (test != NULL && test->timestamps) {
++ 	time(&now);
++ 	ltm = localtime(&now);
++-	strftime(iperf_timestrerr, sizeof(iperf_timestrerr), "%c ", ltm);
+++	strftime(iperf_timestrerr, sizeof(iperf_timestrerr), "%Y-%m-%d %H:%M:%S", ltm);
++ 	ct = iperf_timestrerr;
++     }
++ 
+diff --git a/feeds/packages/net/iperf3/patches/020-big-endian.patch b/feeds/packages/net/iperf3/patches/020-big-endian.patch
+new file mode 100644
+index 0000000000000..35490c9dec833
+--- /dev/null
++++ b/feeds/packages/net/iperf3/patches/020-big-endian.patch
+@@ -0,0 +1,21 @@
++From fe09305eb6f907e4eb637b8edd0c8a986187d1dd Mon Sep 17 00:00:00 2001
++From: Rosen Penev <rosenp@gmail.com>
++Date: Sat, 8 Jun 2024 15:23:51 -0700
++Subject: [PATCH] fix crash under big endian musl
++
++iperf_printf is using an int format here but an int64_t variable. The format only needs the first 3 digits. Cast to int to fix it.
++---
++ src/iperf_api.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++--- a/src/iperf_api.c
+++++ b/src/iperf_api.c
++@@ -4056,7 +4056,7 @@ iperf_print_results(struct iperf_test *t
++                                 iperf_printf(test, report_sender_not_available_summary_format, "SUM");
++                         }
++                         else {
++-                          iperf_printf(test, report_sum_bw_retrans_format, mbuf, start_time, sender_time, ubuf, nbuf, total_retransmits, report_sender);
+++                          iperf_printf(test, report_sum_bw_retrans_format, mbuf, start_time, sender_time, ubuf, nbuf, (int)total_retransmits, report_sender);
++                         }
++                 } else {
++                     /* Summary sum, TCP without retransmits. */
