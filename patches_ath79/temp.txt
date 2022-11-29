@@ -1,0 +1,1 @@
+https://git.codelinaro.org/clo/qsdk/oss/firmware/ath10k-firmware/-/raw/ddcec9efd245da9365c474f513a855a55f3ac7fe/ath10k/QCA99X0/hw2.0/board-2.bin
