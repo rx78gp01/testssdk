@@ -1,0 +1,3086 @@
+diff --git a/package/libs/openssl/patches/0077-Correct-ossl_sleep-for-threaded-model-by-introducing.patch b/package/libs/openssl/patches/0077-Correct-ossl_sleep-for-threaded-model-by-introducing.patch
+new file mode 100644
+index 0000000..af67e8f
+--- /dev/null
++++ b/package/libs/openssl/patches/0077-Correct-ossl_sleep-for-threaded-model-by-introducing.patch
+@@ -0,0 +1,57 @@
++From c263b1fd692bd610b1a3879a9cdad74f3ffe321d Mon Sep 17 00:00:00 2001
++From: "Randall S. Becker" <randall.becker@nexbridge.ca>
++Date: Mon, 25 Mar 2024 19:30:53 +0000
++Subject: [PATCH 077/104] Correct ossl_sleep for threaded model by introducing
++ sleep().
++
++This fix handles situations where ossl_sleep() receives a millis value equal
++or greater than 1000, which breaks platforms where this is not legal. The
++change also avoids unnecessarily calling sleep(0).
++
++Fixes: #23961
++
++Signed-off-by: Randall S. Becker <randall.becker@nexbridge.ca>
++
++Reviewed-by: Tom Cosgrove <tom.cosgrove@arm.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/23972)
++---
++ e_os.h | 18 ++++++++----------
++ 1 file changed, 8 insertions(+), 10 deletions(-)
++
++diff --git a/e_os.h b/e_os.h
++index db05b7f815..4f376570c4 100644
++--- a/e_os.h
+++++ b/e_os.h
++@@ -296,20 +296,18 @@ static ossl_inline void ossl_sleep(unsigned long millis)
++     ts.tv_sec = (long int) (millis / 1000);
++     ts.tv_nsec = (long int) (millis % 1000) * 1000000ul;
++     nanosleep(&ts, NULL);
++-# elif defined(__TANDEM)
++-#  if !defined(_REENTRANT)
+++# elif defined(__TANDEM) && !defined(_REENTRANT)
++ #   include <cextdecs.h(PROCESS_DELAY_)>
+++
++     /* HPNS does not support usleep for non threaded apps */
++     PROCESS_DELAY_(millis * 1000);
++-#  elif defined(_SPT_MODEL_)
++-#   include <spthread.h>
++-#   include <spt_extensions.h>
++-    usleep(millis * 1000);
++-#  else
++-    usleep(millis * 1000);
++-#  endif
++ # else
++-    usleep(millis * 1000);
+++    unsigned int s = (unsigned int)(millis / 1000);
+++    unsigned int us = (unsigned int)((millis % 1000) * 1000);
+++
+++    if (s > 0)
+++        sleep(s);
+++    usleep(us);
++ # endif
++ }
++ #elif defined(_WIN32)
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0078-Add-linux-arm64ilp32-clang-target.patch b/package/libs/openssl/patches/0078-Add-linux-arm64ilp32-clang-target.patch
+new file mode 100644
+index 0000000..f7090fe
+--- /dev/null
++++ b/package/libs/openssl/patches/0078-Add-linux-arm64ilp32-clang-target.patch
+@@ -0,0 +1,42 @@
++From 56a9d4108635df1f65b4cd8895ba339f0cbb2118 Mon Sep 17 00:00:00 2001
++From: Huiyue Xu <xuhuiyue@huawei.com>
++Date: Thu, 9 Nov 2023 10:54:02 +0800
++Subject: [PATCH 078/104] Add linux-arm64ilp32-clang target
++
++While clang 15 config target by '--target', not cannot support
++'-mabi=ilp32', so add the linux-arm64ilp32-clang target.
++
++Signed-off-by: Huiyue Xu <xuhuiyue@huawei.com>
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/22666)
++
++(cherry picked from commit 69bd5e4fff8ac9bf4dc3ed6fd87b5a5858edbb01)
++---
++ Configurations/10-main.conf | 9 ++++++++-
++ 1 file changed, 8 insertions(+), 1 deletion(-)
++
++diff --git a/Configurations/10-main.conf b/Configurations/10-main.conf
++index ff8af71463..1155d9859c 100644
++--- a/Configurations/10-main.conf
+++++ b/Configurations/10-main.conf
++@@ -784,7 +784,14 @@ my %targets = (
++         asm_arch         => 'aarch64',
++         perlasm_scheme   => "linux64",
++     },
++-
+++    "linux-arm64ilp32-clang" => {  # clang config abi by --target
+++        inherit_from     => [ "linux-generic32" ],
+++        CC               => "clang",
+++        CXX              => "clang++",
+++        bn_ops           => "SIXTY_FOUR_BIT RC4_CHAR",
+++        asm_arch         => 'aarch64',
+++        perlasm_scheme   => "linux64",
+++    },
++     "linux-mips32" => {
++         # Configure script adds minimally required -march for assembly
++         # support, if no -march was specified at command line.
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0079-Fix-intermittent-sslapitest-early-data-related-failu.patch b/package/libs/openssl/patches/0079-Fix-intermittent-sslapitest-early-data-related-failu.patch
+new file mode 100644
+index 0000000..9828461
+--- /dev/null
++++ b/package/libs/openssl/patches/0079-Fix-intermittent-sslapitest-early-data-related-failu.patch
+@@ -0,0 +1,206 @@
++From 87e08b7526c8af86675aa34f783501d09911c16b Mon Sep 17 00:00:00 2001
++From: Matt Caswell <matt@openssl.org>
++Date: Mon, 25 Mar 2024 12:32:17 +0000
++Subject: [PATCH 079/104] Fix intermittent sslapitest early data related
++ failures
++
++Early data is time sensitive. We have an approx 8 second allowance between
++writing the early data and reading it. If we exceed that time tests will
++fail. This can sometimes (rarely) occur in normal CI operation. We can try
++and detect this and just ignore the result of such test failures if the test
++has taken too long. We assume anything over 7 seconds is too long.
++
++This is a partial fix for #22605
++
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24320)
++
++(cherry picked from commit ee2b7d5264d9e5498393744e9355dc8b735ab237)
++---
++ test/sslapitest.c | 84 ++++++++++++++++++++++++++++++++++++++---------
++ 1 file changed, 68 insertions(+), 16 deletions(-)
++
++diff --git a/test/sslapitest.c b/test/sslapitest.c
++index cb098a46f5..376d5ddc4d 100644
++--- a/test/sslapitest.c
+++++ b/test/sslapitest.c
++@@ -3489,6 +3489,25 @@ static int setupearly_data_test(SSL_CTX **cctx, SSL_CTX **sctx, SSL **clientssl,
++     return 1;
++ }
++ 
+++static int check_early_data_timeout(time_t timer)
+++{
+++    int res = 0;
+++
+++    /*
+++     * Early data is time sensitive. We have an approx 8 second allowance
+++     * between writing the early data and reading it. If we exceed that time
+++     * then this test will fail. This can sometimes (rarely) occur in normal CI
+++     * operation. We can try and detect this and just ignore the result of this
+++     * test if it has taken too long. We assume anything over 7 seconds is too
+++     * long
+++     */
+++    timer = time(NULL) - timer;
+++    if (timer >= 7)
+++        res = TEST_skip("Test took too long, ignoring result");
+++
+++    return res;
+++}
+++
++ static int test_early_data_read_write(int idx)
++ {
++     SSL_CTX *cctx = NULL, *sctx = NULL;
++@@ -3498,6 +3517,7 @@ static int test_early_data_read_write(int idx)
++     unsigned char buf[20], data[1024];
++     size_t readbytes, written, eoedlen, rawread, rawwritten;
++     BIO *rbio;
+++    time_t timer;
++ 
++     if (!TEST_true(setupearly_data_test(&cctx, &sctx, &clientssl,
++                                         &serverssl, &sess, idx,
++@@ -3505,13 +3525,20 @@ static int test_early_data_read_write(int idx)
++         goto end;
++ 
++     /* Write and read some early data */
+++    timer = time(NULL);
++     if (!TEST_true(SSL_write_early_data(clientssl, MSG1, strlen(MSG1),
++                                         &written))
++-            || !TEST_size_t_eq(written, strlen(MSG1))
++-            || !TEST_int_eq(SSL_read_early_data(serverssl, buf,
++-                                                sizeof(buf), &readbytes),
++-                            SSL_READ_EARLY_DATA_SUCCESS)
++-            || !TEST_mem_eq(MSG1, readbytes, buf, strlen(MSG1))
+++            || !TEST_size_t_eq(written, strlen(MSG1)))
+++        goto end;
+++
+++    if (!TEST_int_eq(SSL_read_early_data(serverssl, buf, sizeof(buf),
+++                                         &readbytes),
+++                     SSL_READ_EARLY_DATA_SUCCESS)) {
+++        testresult = check_early_data_timeout(timer);
+++        goto end;
+++    }
+++
+++    if (!TEST_mem_eq(MSG1, readbytes, buf, strlen(MSG1))
++             || !TEST_int_eq(SSL_get_early_data_status(serverssl),
++                             SSL_EARLY_DATA_ACCEPTED))
++         goto end;
++@@ -3728,6 +3755,7 @@ static int test_early_data_replay_int(int idx, int usecb, int confopt)
++     SSL_SESSION *sess = NULL;
++     size_t readbytes, written;
++     unsigned char buf[20];
+++    time_t timer;
++ 
++     allow_ed_cb_called = 0;
++ 
++@@ -3782,6 +3810,7 @@ static int test_early_data_replay_int(int idx, int usecb, int confopt)
++         goto end;
++ 
++     /* Write and read some early data */
+++    timer = time(NULL);
++     if (!TEST_true(SSL_write_early_data(clientssl, MSG1, strlen(MSG1),
++                                         &written))
++             || !TEST_size_t_eq(written, strlen(MSG1)))
++@@ -3802,8 +3831,11 @@ static int test_early_data_replay_int(int idx, int usecb, int confopt)
++         /* In this case the callback decides to accept the early data */
++         if (!TEST_int_eq(SSL_read_early_data(serverssl, buf, sizeof(buf),
++                                              &readbytes),
++-                         SSL_READ_EARLY_DATA_SUCCESS)
++-                || !TEST_mem_eq(MSG1, strlen(MSG1), buf, readbytes)
+++                         SSL_READ_EARLY_DATA_SUCCESS)) {
+++            testresult = check_early_data_timeout(timer);
+++            goto end;
+++        }
+++        if (!TEST_mem_eq(MSG1, strlen(MSG1), buf, readbytes)
++                    /*
++                     * Server will have sent its flight so client can now send
++                     * end of early data and complete its half of the handshake
++@@ -4320,13 +4352,19 @@ static int test_early_data_psk(int idx)
++                 || !TEST_int_eq(ERR_GET_REASON(ERR_get_error()), err))
++             goto end;
++     } else {
+++        time_t timer = time(NULL);
+++
++         if (!TEST_true(SSL_write_early_data(clientssl, MSG1, strlen(MSG1),
++                                             &written)))
++             goto end;
++ 
++         if (!TEST_int_eq(SSL_read_early_data(serverssl, buf, sizeof(buf),
++-                                             &readbytes), readearlyres)
++-                || (readearlyres == SSL_READ_EARLY_DATA_SUCCESS
+++                                             &readbytes), readearlyres)) {
+++            testresult = check_early_data_timeout(timer);
+++            goto end;
+++        }
+++
+++        if ((readearlyres == SSL_READ_EARLY_DATA_SUCCESS
++                     && !TEST_mem_eq(buf, readbytes, MSG1, strlen(MSG1)))
++                 || !TEST_int_eq(SSL_get_early_data_status(serverssl), edstatus)
++                 || !TEST_int_eq(SSL_connect(clientssl), connectres))
++@@ -4364,6 +4402,7 @@ static int test_early_data_psk_with_all_ciphers(int idx)
++     unsigned char buf[20];
++     size_t readbytes, written;
++     const SSL_CIPHER *cipher;
+++    time_t timer;
++     const char *cipher_str[] = {
++         TLS1_3_RFC_AES_128_GCM_SHA256,
++         TLS1_3_RFC_AES_256_GCM_SHA384,
++@@ -4415,14 +4454,19 @@ static int test_early_data_psk_with_all_ciphers(int idx)
++         goto end;
++ 
++     SSL_set_connect_state(clientssl);
+++    timer = time(NULL);
++     if (!TEST_true(SSL_write_early_data(clientssl, MSG1, strlen(MSG1),
++                                         &written)))
++         goto end;
++ 
++     if (!TEST_int_eq(SSL_read_early_data(serverssl, buf, sizeof(buf),
++                                          &readbytes),
++-                                         SSL_READ_EARLY_DATA_SUCCESS)
++-            || !TEST_mem_eq(buf, readbytes, MSG1, strlen(MSG1))
+++                                         SSL_READ_EARLY_DATA_SUCCESS)) {
+++        testresult = check_early_data_timeout(timer);
+++        goto end;
+++    }
+++
+++    if (!TEST_mem_eq(buf, readbytes, MSG1, strlen(MSG1))
++             || !TEST_int_eq(SSL_get_early_data_status(serverssl),
++                                                       SSL_EARLY_DATA_ACCEPTED)
++             || !TEST_int_eq(SSL_connect(clientssl), 1)
++@@ -7466,6 +7510,7 @@ static int test_info_callback(int tst)
++         SSL_SESSION *sess = NULL;
++         size_t written, readbytes;
++         unsigned char buf[80];
+++        time_t timer;
++ 
++         /* early_data tests */
++         if (!TEST_true(setupearly_data_test(&cctx, &sctx, &clientssl,
++@@ -7480,13 +7525,20 @@ static int test_info_callback(int tst)
++                               sslapi_info_callback);
++ 
++         /* Write and read some early data and then complete the connection */
+++        timer = time(NULL);
++         if (!TEST_true(SSL_write_early_data(clientssl, MSG1, strlen(MSG1),
++                                             &written))
++-                || !TEST_size_t_eq(written, strlen(MSG1))
++-                || !TEST_int_eq(SSL_read_early_data(serverssl, buf,
++-                                                    sizeof(buf), &readbytes),
++-                                SSL_READ_EARLY_DATA_SUCCESS)
++-                || !TEST_mem_eq(MSG1, readbytes, buf, strlen(MSG1))
+++                || !TEST_size_t_eq(written, strlen(MSG1)))
+++            goto end;
+++
+++        if (!TEST_int_eq(SSL_read_early_data(serverssl, buf,
+++                                             sizeof(buf), &readbytes),
+++                         SSL_READ_EARLY_DATA_SUCCESS)) {
+++            testresult = check_early_data_timeout(timer);
+++            goto end;
+++        }
+++
+++        if (!TEST_mem_eq(MSG1, readbytes, buf, strlen(MSG1))
++                 || !TEST_int_eq(SSL_get_early_data_status(serverssl),
++                                 SSL_EARLY_DATA_ACCEPTED)
++                 || !TEST_true(create_ssl_connection(serverssl, clientssl,
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0080-Avoid-memory-leak-in-x509_test-error-path.patch b/package/libs/openssl/patches/0080-Avoid-memory-leak-in-x509_test-error-path.patch
+new file mode 100644
+index 0000000..ff5eefc
+--- /dev/null
++++ b/package/libs/openssl/patches/0080-Avoid-memory-leak-in-x509_test-error-path.patch
+@@ -0,0 +1,70 @@
++From fc6c3a9e22efd396f2ec84f48da6c4f38439084b Mon Sep 17 00:00:00 2001
++From: Viktor Dukhovni <openssl-users@dukhovni.org>
++Date: Wed, 27 Mar 2024 18:15:29 -0400
++Subject: [PATCH 080/104] Avoid memory leak in x509_test error path
++
++Fixes #23897
++
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/23991)
++
++(cherry picked from commit 7cbca5a6d6e792c75c414e1f3fb22e2afae67988)
++---
++ test/v3ext.c | 15 ++++++++++++---
++ 1 file changed, 12 insertions(+), 3 deletions(-)
++
++diff --git a/test/v3ext.c b/test/v3ext.c
++index 88034db271..6c5b3f8371 100644
++--- a/test/v3ext.c
+++++ b/test/v3ext.c
++@@ -269,17 +269,20 @@ static int test_addr_fam_len(void)
++         goto end;
++     if (!ASN1_OCTET_STRING_set(f1->addressFamily, key, keylen))
++         goto end;
+++
+++    /* Push and transfer memory ownership to stack */
++     if (!sk_IPAddressFamily_push(addr, f1))
++         goto end;
+++    f1 = NULL;
++ 
++     /* Shouldn't be able to canonize this as the len is > 3*/
++     if (!TEST_false(X509v3_addr_canonize(addr)))
++         goto end;
++ 
++-    /* Create a well formed IPAddressFamily */
++-    f1 = sk_IPAddressFamily_pop(addr);
++-    IPAddressFamily_free(f1);
+++    /* Pop and free the new stack element */
+++    IPAddressFamily_free(sk_IPAddressFamily_pop(addr));
++ 
+++    /* Create a well-formed IPAddressFamily */
++     key[0] = (afi >> 8) & 0xFF;
++     key[1] = afi & 0xFF;
++     key[2] = 0x1;
++@@ -297,8 +300,11 @@ static int test_addr_fam_len(void)
++ 
++     /* Mark this as inheritance so we skip some of the is_canonize checks */
++     f1->ipAddressChoice->type = IPAddressChoice_inherit;
+++
+++    /* Push and transfer memory ownership to stack */
++     if (!sk_IPAddressFamily_push(addr, f1))
++         goto end;
+++    f1 = NULL;
++ 
++     /* Should be able to canonize now */
++     if (!TEST_true(X509v3_addr_canonize(addr)))
++@@ -306,7 +312,10 @@ static int test_addr_fam_len(void)
++ 
++     testresult = 1;
++   end:
+++    /* Free stack and any memory owned by detached element */
+++    IPAddressFamily_free(f1);
++     sk_IPAddressFamily_pop_free(addr, IPAddressFamily_free);
+++
++     ASN1_OCTET_STRING_free(ip1);
++     ASN1_OCTET_STRING_free(ip2);
++     return testresult;
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0081-Make-BN_generate_dsa_nonce-constant-time-and-non-bia.patch b/package/libs/openssl/patches/0081-Make-BN_generate_dsa_nonce-constant-time-and-non-bia.patch
+new file mode 100644
+index 0000000..5b5433c
+--- /dev/null
++++ b/package/libs/openssl/patches/0081-Make-BN_generate_dsa_nonce-constant-time-and-non-bia.patch
+@@ -0,0 +1,245 @@
++From b169c2c88611bed8bd1b6f0f8aea9bac4097372d Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Thu, 11 Apr 2024 13:10:09 +0200
++Subject: [PATCH 081/104] Make BN_generate_dsa_nonce() constant time and
++ non-biased
++
++Co-authored-by: Paul Dale <ppzgs1@gmail.com>
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++
++(cherry picked from commit d7d1bdcb6aa3d5000bf7f5ebc5518be5c91fd5a5)
++
++(Merged from https://github.com/openssl/openssl/pull/24317)
++
++(cherry picked from commit 0df711a25da6e99a7ce0dbaf992acb644252385f)
++---
++ crypto/bn/bn_lib.c               | 34 ++++++++++++--
++ crypto/bn/bn_local.h             |  1 +
++ crypto/bn/bn_rand.c              | 78 +++++++++++++++++++-------------
++ include/internal/constant_time.h | 12 +++++
++ 4 files changed, 89 insertions(+), 36 deletions(-)
++
++diff --git a/crypto/bn/bn_lib.c b/crypto/bn/bn_lib.c
++index cf1bfe8ab0..bbfa882ad4 100644
++--- a/crypto/bn/bn_lib.c
+++++ b/crypto/bn/bn_lib.c
++@@ -618,14 +618,29 @@ int BN_ucmp(const BIGNUM *a, const BIGNUM *b)
++     int i;
++     BN_ULONG t1, t2, *ap, *bp;
++ 
+++    ap = a->d;
+++    bp = b->d;
+++
+++    if (BN_get_flags(a, BN_FLG_CONSTTIME)
+++            && a->top == b->top) {
+++        int res = 0;
+++
+++        for (i = 0; i < b->top; i++) {
+++            res = constant_time_select_int(constant_time_lt_bn(ap[i], bp[i]),
+++                                           -1, res);
+++            res = constant_time_select_int(constant_time_lt_bn(bp[i], ap[i]),
+++                                           1, res);
+++        }
+++        return res;
+++    }
+++
++     bn_check_top(a);
++     bn_check_top(b);
++ 
++     i = a->top - b->top;
++     if (i != 0)
++         return i;
++-    ap = a->d;
++-    bp = b->d;
+++
++     for (i = a->top - 1; i >= 0; i--) {
++         t1 = ap[i];
++         t2 = bp[i];
++@@ -737,11 +752,10 @@ int BN_is_bit_set(const BIGNUM *a, int n)
++     return (int)(((a->d[i]) >> j) & ((BN_ULONG)1));
++ }
++ 
++-int BN_mask_bits(BIGNUM *a, int n)
+++int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n)
++ {
++     int b, w;
++ 
++-    bn_check_top(a);
++     if (n < 0)
++         return 0;
++ 
++@@ -755,10 +769,20 @@ int BN_mask_bits(BIGNUM *a, int n)
++         a->top = w + 1;
++         a->d[w] &= ~(BN_MASK2 << b);
++     }
++-    bn_correct_top(a);
++     return 1;
++ }
++ 
+++int BN_mask_bits(BIGNUM *a, int n)
+++{
+++    int ret;
+++
+++    bn_check_top(a);
+++    ret = ossl_bn_mask_bits_fixed_top(a, n);
+++    if (ret)
+++        bn_correct_top(a);
+++    return ret;
+++}
+++
++ void BN_set_negative(BIGNUM *a, int b)
++ {
++     if (b && !BN_is_zero(a))
++diff --git a/crypto/bn/bn_local.h b/crypto/bn/bn_local.h
++index 50e9d26e21..d355d1fce3 100644
++--- a/crypto/bn/bn_local.h
+++++ b/crypto/bn/bn_local.h
++@@ -676,5 +676,6 @@ static ossl_inline BIGNUM *bn_expand(BIGNUM *a, int bits)
++ 
++ int ossl_bn_check_prime(const BIGNUM *w, int checks, BN_CTX *ctx,
++                         int do_trial_division, BN_GENCB *cb);
+++int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n);
++ 
++ #endif
++diff --git a/crypto/bn/bn_rand.c b/crypto/bn/bn_rand.c
++index 2ca426ff76..fb3d7057df 100644
++--- a/crypto/bn/bn_rand.c
+++++ b/crypto/bn/bn_rand.c
++@@ -260,20 +260,22 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++     unsigned char random_bytes[64];
++     unsigned char digest[SHA512_DIGEST_LENGTH];
++     unsigned done, todo;
++-    /* We generate |range|+8 bytes of random output. */
++-    const unsigned num_k_bytes = BN_num_bytes(range) + 8;
+++    /* We generate |range|+1 bytes of random output. */
+++    const unsigned num_k_bytes = BN_num_bytes(range) + 1;
++     unsigned char private_bytes[96];
++     unsigned char *k_bytes = NULL;
+++    const int max_n = 64;           /* Pr(failure to generate) < 2^max_n */
+++    int n;
++     int ret = 0;
++     EVP_MD *md = NULL;
++     OSSL_LIB_CTX *libctx = ossl_bn_get_libctx(ctx);
++ 
++     if (mdctx == NULL)
++-        goto err;
+++        goto end;
++ 
++     k_bytes = OPENSSL_malloc(num_k_bytes);
++     if (k_bytes == NULL)
++-        goto err;
+++        goto end;
++ 
++     /* We copy |priv| into a local buffer to avoid exposing its length. */
++     if (BN_bn2binpad(priv, private_bytes, sizeof(private_bytes)) < 0) {
++@@ -283,41 +285,55 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++          * length of the private key.
++          */
++         ERR_raise(ERR_LIB_BN, BN_R_PRIVATE_KEY_TOO_LARGE);
++-        goto err;
+++        goto end;
++     }
++ 
++     md = EVP_MD_fetch(libctx, "SHA512", NULL);
++     if (md == NULL) {
++         ERR_raise(ERR_LIB_BN, BN_R_NO_SUITABLE_DIGEST);
++-        goto err;
++-    }
++-    for (done = 0; done < num_k_bytes;) {
++-        if (RAND_priv_bytes_ex(libctx, random_bytes, sizeof(random_bytes), 0) <= 0)
++-            goto err;
++-
++-        if (!EVP_DigestInit_ex(mdctx, md, NULL)
++-                || !EVP_DigestUpdate(mdctx, &done, sizeof(done))
++-                || !EVP_DigestUpdate(mdctx, private_bytes,
++-                                     sizeof(private_bytes))
++-                || !EVP_DigestUpdate(mdctx, message, message_len)
++-                || !EVP_DigestUpdate(mdctx, random_bytes, sizeof(random_bytes))
++-                || !EVP_DigestFinal_ex(mdctx, digest, NULL))
++-            goto err;
++-
++-        todo = num_k_bytes - done;
++-        if (todo > SHA512_DIGEST_LENGTH)
++-            todo = SHA512_DIGEST_LENGTH;
++-        memcpy(k_bytes + done, digest, todo);
++-        done += todo;
+++        goto end;
++     }
+++    for (n = 0; n < max_n; n++) {
+++        for (done = 0; done < num_k_bytes;) {
+++            if (RAND_priv_bytes_ex(libctx, random_bytes, sizeof(random_bytes),
+++                                   0) <= 0)
+++                goto end;
+++
+++            if (!EVP_DigestInit_ex(mdctx, md, NULL)
+++                    || !EVP_DigestUpdate(mdctx, &done, sizeof(done))
+++                    || !EVP_DigestUpdate(mdctx, private_bytes,
+++                                         sizeof(private_bytes))
+++                    || !EVP_DigestUpdate(mdctx, message, message_len)
+++                    || !EVP_DigestUpdate(mdctx, random_bytes,
+++                                         sizeof(random_bytes))
+++                    || !EVP_DigestFinal_ex(mdctx, digest, NULL))
+++                goto end;
+++
+++            todo = num_k_bytes - done;
+++            if (todo > SHA512_DIGEST_LENGTH)
+++                todo = SHA512_DIGEST_LENGTH;
+++            memcpy(k_bytes + done, digest, todo);
+++            done += todo;
+++        }
++ 
++-    if (!BN_bin2bn(k_bytes, num_k_bytes, out))
++-        goto err;
++-    if (BN_mod(out, out, range, ctx) != 1)
++-        goto err;
++-    ret = 1;
+++        /* Ensure top byte is set to avoid non-constant time in bin2bn */
+++        k_bytes[0] = 0x80;
+++        if (!BN_bin2bn(k_bytes, num_k_bytes, out))
+++            goto end;
++ 
++- err:
+++        /* Clear out the top bits and rejection filter into range */
+++        BN_set_flags(out, BN_FLG_CONSTTIME | BN_FLG_FIXED_TOP);
+++        ossl_bn_mask_bits_fixed_top(out, BN_num_bits(range));
+++
+++        if (BN_ucmp(out, range) < 0) {
+++            ret = 1;
+++            goto end;
+++        }
+++    }
+++    /* Failed to generate anything */
+++    ERR_raise(ERR_LIB_BN, ERR_R_INTERNAL_ERROR);
+++
+++ end:
++     EVP_MD_CTX_free(mdctx);
++     EVP_MD_free(md);
++     OPENSSL_clear_free(k_bytes, num_k_bytes);
++diff --git a/include/internal/constant_time.h b/include/internal/constant_time.h
++index 0ed6f823c1..e8244cd57b 100644
++--- a/include/internal/constant_time.h
+++++ b/include/internal/constant_time.h
++@@ -140,6 +140,18 @@ static ossl_inline uint64_t constant_time_lt_64(uint64_t a, uint64_t b)
++     return constant_time_msb_64(a ^ ((a ^ b) | ((a - b) ^ b)));
++ }
++ 
+++#ifdef BN_ULONG
+++static ossl_inline BN_ULONG constant_time_msb_bn(BN_ULONG a)
+++{
+++    return 0 - (a >> (sizeof(a) * 8 - 1));
+++}
+++
+++static ossl_inline BN_ULONG constant_time_lt_bn(BN_ULONG a, BN_ULONG b)
+++{
+++    return constant_time_msb_bn(a ^ ((a ^ b) | ((a - b) ^ b)));
+++}
+++#endif
+++
++ static ossl_inline unsigned int constant_time_ge(unsigned int a,
++                                                  unsigned int b)
++ {
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0082-Add-ossl_bn_is_word_fixed_top.patch b/package/libs/openssl/patches/0082-Add-ossl_bn_is_word_fixed_top.patch
+new file mode 100644
+index 0000000..1cc1ebf
+--- /dev/null
++++ b/package/libs/openssl/patches/0082-Add-ossl_bn_is_word_fixed_top.patch
+@@ -0,0 +1,145 @@
++From 40163b53f1f713a28b56e05fca30c87a696d20ac Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Thu, 25 Apr 2024 15:35:36 +0200
++Subject: [PATCH 082/104] Add ossl_bn_is_word_fixed_top()
++
++Also correct some BN_FLG_FIXED_TOP flag handling.
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++
++(cherry picked from commit 2d285fa873028f6cff9484a0cdf690fe05d7fb16)
++
++(Merged from https://github.com/openssl/openssl/pull/24317)
++
++(cherry picked from commit 5dbb2a8ca2c1ba42dfb9445b5ea76adccbdb9744)
++---
++ crypto/bn/bn_lib.c               | 17 +++++++++++++++++
++ crypto/bn/bn_local.h             |  1 -
++ crypto/bn/bn_rand.c              |  2 +-
++ crypto/bn/bn_shift.c             |  6 +++---
++ include/crypto/bn.h              |  2 ++
++ include/internal/constant_time.h | 11 +++++++++++
++ 6 files changed, 34 insertions(+), 5 deletions(-)
++
++diff --git a/crypto/bn/bn_lib.c b/crypto/bn/bn_lib.c
++index bbfa882ad4..1d60015e0e 100644
++--- a/crypto/bn/bn_lib.c
+++++ b/crypto/bn/bn_lib.c
++@@ -769,6 +769,7 @@ int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n)
++         a->top = w + 1;
++         a->d[w] &= ~(BN_MASK2 << b);
++     }
+++    a->flags |= BN_FLG_FIXED_TOP;
++     return 1;
++ }
++ 
++@@ -959,6 +960,22 @@ int BN_is_word(const BIGNUM *a, const BN_ULONG w)
++     return BN_abs_is_word(a, w) && (!w || !a->neg);
++ }
++ 
+++int ossl_bn_is_word_fixed_top(const BIGNUM *a, BN_ULONG w)
+++{
+++    int res, i;
+++    const BN_ULONG *ap = a->d;
+++
+++    if (a->neg || a->top == 0)
+++        return 0;
+++
+++    res = constant_time_select_int(constant_time_eq_bn(ap[0], w), 1, 0);
+++
+++    for (i = 1; i < a->top; i++)
+++        res = constant_time_select_int(constant_time_is_zero_bn(ap[i]),
+++                                       res, 0);
+++    return res;
+++}
+++
++ int BN_is_odd(const BIGNUM *a)
++ {
++     return (a->top > 0) && (a->d[0] & 1);
++diff --git a/crypto/bn/bn_local.h b/crypto/bn/bn_local.h
++index d355d1fce3..50e9d26e21 100644
++--- a/crypto/bn/bn_local.h
+++++ b/crypto/bn/bn_local.h
++@@ -676,6 +676,5 @@ static ossl_inline BIGNUM *bn_expand(BIGNUM *a, int bits)
++ 
++ int ossl_bn_check_prime(const BIGNUM *w, int checks, BN_CTX *ctx,
++                         int do_trial_division, BN_GENCB *cb);
++-int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n);
++ 
++ #endif
++diff --git a/crypto/bn/bn_rand.c b/crypto/bn/bn_rand.c
++index fb3d7057df..b0b3d3ffe2 100644
++--- a/crypto/bn/bn_rand.c
+++++ b/crypto/bn/bn_rand.c
++@@ -322,7 +322,7 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++             goto end;
++ 
++         /* Clear out the top bits and rejection filter into range */
++-        BN_set_flags(out, BN_FLG_CONSTTIME | BN_FLG_FIXED_TOP);
+++        BN_set_flags(out, BN_FLG_CONSTTIME);
++         ossl_bn_mask_bits_fixed_top(out, BN_num_bits(range));
++ 
++         if (BN_ucmp(out, range) < 0) {
++diff --git a/crypto/bn/bn_shift.c b/crypto/bn/bn_shift.c
++index 8fcb04324e..a6976c7130 100644
++--- a/crypto/bn/bn_shift.c
+++++ b/crypto/bn/bn_shift.c
++@@ -156,6 +156,9 @@ int BN_rshift(BIGNUM *r, const BIGNUM *a, int n)
++         return 0;
++     }
++ 
+++    bn_check_top(r);
+++    bn_check_top(a);
+++
++     ret = bn_rshift_fixed_top(r, a, n);
++ 
++     bn_correct_top(r);
++@@ -177,9 +180,6 @@ int bn_rshift_fixed_top(BIGNUM *r, const BIGNUM *a, int n)
++     BN_ULONG *t, *f;
++     BN_ULONG l, m, mask;
++ 
++-    bn_check_top(r);
++-    bn_check_top(a);
++-
++     assert(n >= 0);
++ 
++     nw = n / BN_BITS2;
++diff --git a/include/crypto/bn.h b/include/crypto/bn.h
++index fd1c09d997..d875ca9e9c 100644
++--- a/include/crypto/bn.h
+++++ b/include/crypto/bn.h
++@@ -87,6 +87,8 @@ int bn_lshift_fixed_top(BIGNUM *r, const BIGNUM *a, int n);
++ int bn_rshift_fixed_top(BIGNUM *r, const BIGNUM *a, int n);
++ int bn_div_fixed_top(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m,
++                      const BIGNUM *d, BN_CTX *ctx);
+++int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n);
+++int ossl_bn_is_word_fixed_top(const BIGNUM *a, BN_ULONG w);
++ 
++ #define BN_PRIMETEST_COMPOSITE                    0
++ #define BN_PRIMETEST_COMPOSITE_WITH_FACTOR        1
++diff --git a/include/internal/constant_time.h b/include/internal/constant_time.h
++index e8244cd57b..f2572ded51 100644
++--- a/include/internal/constant_time.h
+++++ b/include/internal/constant_time.h
++@@ -150,6 +150,17 @@ static ossl_inline BN_ULONG constant_time_lt_bn(BN_ULONG a, BN_ULONG b)
++ {
++     return constant_time_msb_bn(a ^ ((a ^ b) | ((a - b) ^ b)));
++ }
+++
+++static ossl_inline BN_ULONG constant_time_is_zero_bn(BN_ULONG a)
+++{
+++    return constant_time_msb_bn(~a & (a - 1));
+++}
+++
+++static ossl_inline BN_ULONG constant_time_eq_bn(BN_ULONG a,
+++                                                BN_ULONG b)
+++{
+++    return constant_time_is_zero_bn(a ^ b);
+++}
++ #endif
++ 
++ static ossl_inline unsigned int constant_time_ge(unsigned int a,
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0083-Add-ossl_bn_priv_rand_range_fixed_top-and-use-it-for.patch b/package/libs/openssl/patches/0083-Add-ossl_bn_priv_rand_range_fixed_top-and-use-it-for.patch
+new file mode 100644
+index 0000000..ae3c647
+--- /dev/null
++++ b/package/libs/openssl/patches/0083-Add-ossl_bn_priv_rand_range_fixed_top-and-use-it-for.patch
+@@ -0,0 +1,135 @@
++From 8e4c17b7cbeba5f08dffe68d4a2b6a31e7c27b9c Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Thu, 25 Apr 2024 19:26:08 +0200
++Subject: [PATCH 083/104] Add ossl_bn_priv_rand_range_fixed_top() and use it
++ for EC/DSA
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++
++(cherry picked from commit 13b3ca5c998e6db4f7251a56c43541cb1a422bd0)
++
++(Merged from https://github.com/openssl/openssl/pull/24317)
++
++(cherry picked from commit a70ca93cdbc0ed36bf783b9eadc4cea35986b139)
++---
++ crypto/bn/bn_rand.c    | 45 ++++++++++++++++++++++++++++++++++++++++--
++ crypto/dsa/dsa_ossl.c  |  4 ++--
++ crypto/ec/ecdsa_ossl.c |  4 ++--
++ include/crypto/bn.h    |  2 ++
++ 4 files changed, 49 insertions(+), 6 deletions(-)
++
++diff --git a/crypto/bn/bn_rand.c b/crypto/bn/bn_rand.c
++index b0b3d3ffe2..a362e33131 100644
++--- a/crypto/bn/bn_rand.c
+++++ b/crypto/bn/bn_rand.c
++@@ -186,8 +186,8 @@ static int bnrand_range(BNRAND_FLAG flag, BIGNUM *r, const BIGNUM *range,
++     } else {
++         do {
++             /* range = 11..._2  or  range = 101..._2 */
++-            if (!bnrand(flag, r, n, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY, 0,
++-                        ctx))
+++            if (!bnrand(flag, r, n, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY,
+++                        strength, ctx))
++                 return 0;
++ 
++             if (!--count) {
++@@ -240,6 +240,47 @@ int BN_pseudo_rand_range(BIGNUM *r, const BIGNUM *range)
++ # endif
++ #endif
++ 
+++int ossl_bn_priv_rand_range_fixed_top(BIGNUM *r, const BIGNUM *range,
+++                                      unsigned int strength, BN_CTX *ctx)
+++{
+++    int n;
+++    int count = 100;
+++
+++    if (r == NULL) {
+++        ERR_raise(ERR_LIB_BN, ERR_R_PASSED_NULL_PARAMETER);
+++        return 0;
+++    }
+++
+++    if (range->neg || BN_is_zero(range)) {
+++        ERR_raise(ERR_LIB_BN, BN_R_INVALID_RANGE);
+++        return 0;
+++    }
+++
+++    n = BN_num_bits(range);     /* n > 0 */
+++
+++    /* BN_is_bit_set(range, n - 1) always holds */
+++
+++    if (n == 1) {
+++        BN_zero(r);
+++    } else {
+++        BN_set_flags(r, BN_FLG_CONSTTIME);
+++        do {
+++            if (!bnrand(PRIVATE, r, n + 1, BN_RAND_TOP_ONE, BN_RAND_BOTTOM_ANY,
+++                        strength, ctx))
+++                return 0;
+++
+++            if (!--count) {
+++                ERR_raise(ERR_LIB_BN, BN_R_TOO_MANY_ITERATIONS);
+++                return 0;
+++            }
+++            ossl_bn_mask_bits_fixed_top(r, n);
+++        }
+++        while (BN_ucmp(r, range) >= 0);
+++    }
+++
+++    return 1;
+++}
+++
++ /*
++  * BN_generate_dsa_nonce generates a random number 0 <= out < range. Unlike
++  * BN_rand_range, it also includes the contents of |priv| and |message| in
++diff --git a/crypto/dsa/dsa_ossl.c b/crypto/dsa/dsa_ossl.c
++index 8fd66a950e..619b91c795 100644
++--- a/crypto/dsa/dsa_ossl.c
+++++ b/crypto/dsa/dsa_ossl.c
++@@ -265,9 +265,9 @@ static int dsa_sign_setup(DSA *dsa, BN_CTX *ctx_in,
++             if (!BN_generate_dsa_nonce(k, dsa->params.q, dsa->priv_key, dgst,
++                                        dlen, ctx))
++                 goto err;
++-        } else if (!BN_priv_rand_range_ex(k, dsa->params.q, 0, ctx))
+++        } else if (!ossl_bn_priv_rand_range_fixed_top(k, dsa->params.q, 0, ctx))
++             goto err;
++-    } while (BN_is_zero(k));
+++    } while (ossl_bn_is_word_fixed_top(k, 0));
++ 
++     BN_set_flags(k, BN_FLG_CONSTTIME);
++     BN_set_flags(l, BN_FLG_CONSTTIME);
++diff --git a/crypto/ec/ecdsa_ossl.c b/crypto/ec/ecdsa_ossl.c
++index 0bdf45e6e7..1d3ed66623 100644
++--- a/crypto/ec/ecdsa_ossl.c
+++++ b/crypto/ec/ecdsa_ossl.c
++@@ -151,12 +151,12 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
++                     goto err;
++                 }
++             } else {
++-                if (!BN_priv_rand_range_ex(k, order, 0, ctx)) {
+++                if (!ossl_bn_priv_rand_range_fixed_top(k, order, 0, ctx)) {
++                     ERR_raise(ERR_LIB_EC, EC_R_RANDOM_NUMBER_GENERATION_FAILED);
++                     goto err;
++                 }
++             }
++-        } while (BN_is_zero(k));
+++        } while (ossl_bn_is_word_fixed_top(k, 0));
++ 
++         /* compute r the x-coordinate of generator * k */
++         if (!EC_POINT_mul(group, tmp_point, k, NULL, NULL, ctx)) {
++diff --git a/include/crypto/bn.h b/include/crypto/bn.h
++index d875ca9e9c..99966e8651 100644
++--- a/include/crypto/bn.h
+++++ b/include/crypto/bn.h
++@@ -89,6 +89,8 @@ int bn_div_fixed_top(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m,
++                      const BIGNUM *d, BN_CTX *ctx);
++ int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n);
++ int ossl_bn_is_word_fixed_top(const BIGNUM *a, BN_ULONG w);
+++int ossl_bn_priv_rand_range_fixed_top(BIGNUM *r, const BIGNUM *range,
+++                                      unsigned int strength, BN_CTX *ctx);
++ 
++ #define BN_PRIMETEST_COMPOSITE                    0
++ #define BN_PRIMETEST_COMPOSITE_WITH_FACTOR        1
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0084-Rename-BN_generate_dsa_nonce-to-ossl_bn_gen_dsa_nonc.patch b/package/libs/openssl/patches/0084-Rename-BN_generate_dsa_nonce-to-ossl_bn_gen_dsa_nonc.patch
+new file mode 100644
+index 0000000..b61afb4
+--- /dev/null
++++ b/package/libs/openssl/patches/0084-Rename-BN_generate_dsa_nonce-to-ossl_bn_gen_dsa_nonc.patch
+@@ -0,0 +1,164 @@
++From 51f93c3fe756d0c3f5fa1e77b6ae0cbd5f4b1992 Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Mon, 29 Apr 2024 17:56:01 +0200
++Subject: [PATCH 084/104] Rename BN_generate_dsa_nonce() to
++ ossl_bn_gen_dsa_nonce_fixed_top()
++
++And create a new BN_generate_dsa_nonce() that corrects the BIGNUM top.
++We do this to avoid leaking fixed top numbers via the public API.
++
++Also add a slight optimization in ossl_bn_gen_dsa_nonce_fixed_top()
++and make it LE/BE agnostic.
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++
++(cherry picked from commit 9c85f6cd2d6debe5ef6ef475ff4bf17e0985f7a2)
++
++(Merged from https://github.com/openssl/openssl/pull/24317)
++
++(cherry picked from commit fdc3efc371be43d5092bb19823e084f54541cbe3)
++---
++ crypto/bn/bn_rand.c    | 41 +++++++++++++++++++++++++++++++----------
++ crypto/dsa/dsa_ossl.c  |  5 +++--
++ crypto/ec/ecdsa_ossl.c |  4 ++--
++ include/crypto/bn.h    |  4 ++++
++ 4 files changed, 40 insertions(+), 14 deletions(-)
++
++diff --git a/crypto/bn/bn_rand.c b/crypto/bn/bn_rand.c
++index a362e33131..420909e094 100644
++--- a/crypto/bn/bn_rand.c
+++++ b/crypto/bn/bn_rand.c
++@@ -282,16 +282,17 @@ int ossl_bn_priv_rand_range_fixed_top(BIGNUM *r, const BIGNUM *range,
++ }
++ 
++ /*
++- * BN_generate_dsa_nonce generates a random number 0 <= out < range. Unlike
++- * BN_rand_range, it also includes the contents of |priv| and |message| in
++- * the generation so that an RNG failure isn't fatal as long as |priv|
+++ * ossl_bn_gen_dsa_nonce_fixed_top generates a random number 0 <= out < range.
+++ * Unlike BN_rand_range, it also includes the contents of |priv| and |message|
+++ * in the generation so that an RNG failure isn't fatal as long as |priv|
++  * remains secret. This is intended for use in DSA and ECDSA where an RNG
++  * weakness leads directly to private key exposure unless this function is
++  * used.
++  */
++-int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++-                          const BIGNUM *priv, const unsigned char *message,
++-                          size_t message_len, BN_CTX *ctx)
+++int ossl_bn_gen_dsa_nonce_fixed_top(BIGNUM *out, const BIGNUM *range,
+++                                    const BIGNUM *priv,
+++                                    const unsigned char *message,
+++                                    size_t message_len, BN_CTX *ctx)
++ {
++     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
++     /*
++@@ -317,6 +318,8 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++     k_bytes = OPENSSL_malloc(num_k_bytes);
++     if (k_bytes == NULL)
++         goto end;
+++    /* Ensure top byte is set to avoid non-constant time in bin2bn */
+++    k_bytes[0] = 0xff;
++ 
++     /* We copy |priv| into a local buffer to avoid exposing its length. */
++     if (BN_bn2binpad(priv, private_bytes, sizeof(private_bytes)) < 0) {
++@@ -335,13 +338,15 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++         goto end;
++     }
++     for (n = 0; n < max_n; n++) {
++-        for (done = 0; done < num_k_bytes;) {
+++        unsigned char i = 0;
+++
+++        for (done = 1; done < num_k_bytes;) {
++             if (RAND_priv_bytes_ex(libctx, random_bytes, sizeof(random_bytes),
++                                    0) <= 0)
++                 goto end;
++ 
++             if (!EVP_DigestInit_ex(mdctx, md, NULL)
++-                    || !EVP_DigestUpdate(mdctx, &done, sizeof(done))
+++                    || !EVP_DigestUpdate(mdctx, &i, sizeof(i))
++                     || !EVP_DigestUpdate(mdctx, private_bytes,
++                                          sizeof(private_bytes))
++                     || !EVP_DigestUpdate(mdctx, message, message_len)
++@@ -355,10 +360,9 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++                 todo = SHA512_DIGEST_LENGTH;
++             memcpy(k_bytes + done, digest, todo);
++             done += todo;
+++            ++i;
++         }
++ 
++-        /* Ensure top byte is set to avoid non-constant time in bin2bn */
++-        k_bytes[0] = 0x80;
++         if (!BN_bin2bn(k_bytes, num_k_bytes, out))
++             goto end;
++ 
++@@ -383,3 +387,20 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
++     OPENSSL_cleanse(private_bytes, sizeof(private_bytes));
++     return ret;
++ }
+++
+++int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
+++                          const BIGNUM *priv, const unsigned char *message,
+++                          size_t message_len, BN_CTX *ctx)
+++{
+++    int ret;
+++
+++    ret = ossl_bn_gen_dsa_nonce_fixed_top(out, range, priv, message,
+++                                          message_len, ctx);
+++    /*
+++     * This call makes the BN_generate_dsa_nonce non-const-time, thus we
+++     * do not use it internally. But fixed_top BNs currently cannot be returned
+++     * from public API calls.
+++     */
+++    bn_correct_top(out);
+++    return ret;
+++}
++diff --git a/crypto/dsa/dsa_ossl.c b/crypto/dsa/dsa_ossl.c
++index 619b91c795..01f3b068e4 100644
++--- a/crypto/dsa/dsa_ossl.c
+++++ b/crypto/dsa/dsa_ossl.c
++@@ -262,8 +262,9 @@ static int dsa_sign_setup(DSA *dsa, BN_CTX *ctx_in,
++              * We calculate k from SHA512(private_key + H(message) + random).
++              * This protects the private key from a weak PRNG.
++              */
++-            if (!BN_generate_dsa_nonce(k, dsa->params.q, dsa->priv_key, dgst,
++-                                       dlen, ctx))
+++            if (!ossl_bn_gen_dsa_nonce_fixed_top(k, dsa->params.q,
+++                                                 dsa->priv_key, dgst,
+++                                                 dlen, ctx))
++                 goto err;
++         } else if (!ossl_bn_priv_rand_range_fixed_top(k, dsa->params.q, 0, ctx))
++             goto err;
++diff --git a/crypto/ec/ecdsa_ossl.c b/crypto/ec/ecdsa_ossl.c
++index 1d3ed66623..5d51ff9079 100644
++--- a/crypto/ec/ecdsa_ossl.c
+++++ b/crypto/ec/ecdsa_ossl.c
++@@ -145,8 +145,8 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
++         /* get random k */
++         do {
++             if (dgst != NULL) {
++-                if (!BN_generate_dsa_nonce(k, order, priv_key,
++-                                           dgst, dlen, ctx)) {
+++                if (!ossl_bn_gen_dsa_nonce_fixed_top(k, order, priv_key,
+++                                                     dgst, dlen, ctx)) {
++                     ERR_raise(ERR_LIB_EC, EC_R_RANDOM_NUMBER_GENERATION_FAILED);
++                     goto err;
++                 }
++diff --git a/include/crypto/bn.h b/include/crypto/bn.h
++index 99966e8651..c63f2ef77a 100644
++--- a/include/crypto/bn.h
+++++ b/include/crypto/bn.h
++@@ -91,6 +91,10 @@ int ossl_bn_mask_bits_fixed_top(BIGNUM *a, int n);
++ int ossl_bn_is_word_fixed_top(const BIGNUM *a, BN_ULONG w);
++ int ossl_bn_priv_rand_range_fixed_top(BIGNUM *r, const BIGNUM *range,
++                                       unsigned int strength, BN_CTX *ctx);
+++int ossl_bn_gen_dsa_nonce_fixed_top(BIGNUM *out, const BIGNUM *range,
+++                                    const BIGNUM *priv,
+++                                    const unsigned char *message,
+++                                    size_t message_len, BN_CTX *ctx);
++ 
++ #define BN_PRIMETEST_COMPOSITE                    0
++ #define BN_PRIMETEST_COMPOSITE_WITH_FACTOR        1
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0085-Correct-top-for-EC-DSA-nonces-if-BN_DEBUG-is-on.patch b/package/libs/openssl/patches/0085-Correct-top-for-EC-DSA-nonces-if-BN_DEBUG-is-on.patch
+new file mode 100644
+index 0000000..9b912c5
+--- /dev/null
++++ b/package/libs/openssl/patches/0085-Correct-top-for-EC-DSA-nonces-if-BN_DEBUG-is-on.patch
+@@ -0,0 +1,48 @@
++From d8f4038fee95af894ba642a6b8692f6499eb4197 Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Tue, 30 Apr 2024 11:46:26 +0200
++Subject: [PATCH 085/104] Correct top for EC/DSA nonces if BN_DEBUG is on
++
++Otherwise following operations would bail out in bn_check_top().
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++
++(cherry picked from commit a380ae85be287045b1eaa64d23942101a426c080)
++
++(Merged from https://github.com/openssl/openssl/pull/24317)
++
++(cherry picked from commit 549208d1f1175aca5cc1ea989c4e9e4a41bc558c)
++---
++ crypto/bn/bn_rand.c | 8 ++++++++
++ 1 file changed, 8 insertions(+)
++
++diff --git a/crypto/bn/bn_rand.c b/crypto/bn/bn_rand.c
++index 420909e094..7fcd03a3cb 100644
++--- a/crypto/bn/bn_rand.c
+++++ b/crypto/bn/bn_rand.c
++@@ -276,6 +276,10 @@ int ossl_bn_priv_rand_range_fixed_top(BIGNUM *r, const BIGNUM *range,
++             ossl_bn_mask_bits_fixed_top(r, n);
++         }
++         while (BN_ucmp(r, range) >= 0);
+++#ifdef BN_DEBUG
+++        /* With BN_DEBUG on a fixed top number cannot be returned */
+++        bn_correct_top(r);
+++#endif
++     }
++ 
++     return 1;
++@@ -372,6 +376,10 @@ int ossl_bn_gen_dsa_nonce_fixed_top(BIGNUM *out, const BIGNUM *range,
++ 
++         if (BN_ucmp(out, range) < 0) {
++             ret = 1;
+++#ifdef BN_DEBUG
+++            /* With BN_DEBUG on a fixed top number cannot be returned */
+++            bn_correct_top(out);
+++#endif
++             goto end;
++         }
++     }
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0087-Add-reason-codes-with-the-correct-offset-for-two-ale.patch b/package/libs/openssl/patches/0087-Add-reason-codes-with-the-correct-offset-for-two-ale.patch
+new file mode 100644
+index 0000000..3b11771
+--- /dev/null
++++ b/package/libs/openssl/patches/0087-Add-reason-codes-with-the-correct-offset-for-two-ale.patch
+@@ -0,0 +1,92 @@
++From 9e33c9c48f6cde4d607a4205476b2faf442e9cb5 Mon Sep 17 00:00:00 2001
++From: Jacob Champion <jacob.champion@enterprisedb.com>
++Date: Mon, 6 May 2024 09:50:11 -0700
++Subject: [PATCH 087/104] Add reason codes with the correct offset for two
++ alerts
++
++Fixes #24300. The current values of SSL_R_NO_APPLICATION_PROTOCOL and
++SSL_R_PSK_IDENTITY_NOT_FOUND don't allow for a correct lookup of the
++corresponding reason strings.
++
++CLA: trivial
++
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24338)
++---
++ crypto/err/openssl.ec    | 4 ++--
++ include/openssl/sslerr.h | 4 +++-
++ ssl/ssl_err.c            | 6 +++++-
++ 3 files changed, 10 insertions(+), 4 deletions(-)
++
++diff --git a/crypto/err/openssl.ec b/crypto/err/openssl.ec
++index 3612c195f0..f3802a05b5 100644
++--- a/crypto/err/openssl.ec
+++++ b/crypto/err/openssl.ec
++@@ -76,6 +76,6 @@ R SSL_R_TLSV1_CERTIFICATE_UNOBTAINABLE          1111
++ R SSL_R_TLSV1_UNRECOGNIZED_NAME                 1112
++ R SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE   1113
++ R SSL_R_TLSV1_BAD_CERTIFICATE_HASH_VALUE        1114
++-R TLS1_AD_UNKNOWN_PSK_IDENTITY                  1115
+++R SSL_R_TLSV1_ALERT_UNKNOWN_PSK_IDENTITY        1115
++ R SSL_R_TLSV13_ALERT_CERTIFICATE_REQUIRED       1116
++-R TLS1_AD_NO_APPLICATION_PROTOCOL               1120
+++R SSL_R_TLSV1_ALERT_NO_APPLICATION_PROTOCOL     1120
++diff --git a/include/openssl/sslerr.h b/include/openssl/sslerr.h
++index b156fc2ffd..1e36405e32 100644
++--- a/include/openssl/sslerr.h
+++++ b/include/openssl/sslerr.h
++@@ -1,6 +1,6 @@
++ /*
++  * Generated by util/mkerr.pl DO NOT EDIT
++- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+++ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
++  *
++  * Licensed under the Apache License 2.0 (the "License").  You may not use
++  * this file except in compliance with the License.  You can obtain a copy
++@@ -283,10 +283,12 @@
++ # define SSL_R_TLSV1_ALERT_INAPPROPRIATE_FALLBACK         1086
++ # define SSL_R_TLSV1_ALERT_INSUFFICIENT_SECURITY          1071
++ # define SSL_R_TLSV1_ALERT_INTERNAL_ERROR                 1080
+++# define SSL_R_TLSV1_ALERT_NO_APPLICATION_PROTOCOL        1120
++ # define SSL_R_TLSV1_ALERT_NO_RENEGOTIATION               1100
++ # define SSL_R_TLSV1_ALERT_PROTOCOL_VERSION               1070
++ # define SSL_R_TLSV1_ALERT_RECORD_OVERFLOW                1022
++ # define SSL_R_TLSV1_ALERT_UNKNOWN_CA                     1048
+++# define SSL_R_TLSV1_ALERT_UNKNOWN_PSK_IDENTITY           1115
++ # define SSL_R_TLSV1_ALERT_USER_CANCELLED                 1090
++ # define SSL_R_TLSV1_BAD_CERTIFICATE_HASH_VALUE           1114
++ # define SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE      1113
++diff --git a/ssl/ssl_err.c b/ssl/ssl_err.c
++index 41898844ff..75be692e00 100644
++--- a/ssl/ssl_err.c
+++++ b/ssl/ssl_err.c
++@@ -1,6 +1,6 @@
++ /*
++  * Generated by util/mkerr.pl DO NOT EDIT
++- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+++ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
++  *
++  * Licensed under the Apache License 2.0 (the "License").  You may not use
++  * this file except in compliance with the License.  You can obtain a copy
++@@ -457,6 +457,8 @@ static const ERR_STRING_DATA SSL_str_reasons[] = {
++     "tlsv1 alert insufficient security"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_INTERNAL_ERROR),
++     "tlsv1 alert internal error"},
+++    {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_NO_APPLICATION_PROTOCOL),
+++    "tlsv1 alert no application protocol"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_NO_RENEGOTIATION),
++     "tlsv1 alert no renegotiation"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_PROTOCOL_VERSION),
++@@ -465,6 +467,8 @@ static const ERR_STRING_DATA SSL_str_reasons[] = {
++     "tlsv1 alert record overflow"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_UNKNOWN_CA),
++     "tlsv1 alert unknown ca"},
+++    {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_UNKNOWN_PSK_IDENTITY),
+++    "tlsv1 alert unknown psk identity"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_ALERT_USER_CANCELLED),
++     "tlsv1 alert user cancelled"},
++     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_TLSV1_BAD_CERTIFICATE_HASH_VALUE),
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0088-apps-pkcs12-Not-writing-the-private-key-file-until-t.patch b/package/libs/openssl/patches/0088-apps-pkcs12-Not-writing-the-private-key-file-until-t.patch
+new file mode 100644
+index 0000000..4d6e2ac
+--- /dev/null
++++ b/package/libs/openssl/patches/0088-apps-pkcs12-Not-writing-the-private-key-file-until-t.patch
+@@ -0,0 +1,48 @@
++From 49867ad09e29d93b48be7fb9953ed74bbf81b94b Mon Sep 17 00:00:00 2001
++From: naaysayer <note11781@gmail.com>
++Date: Sat, 2 Mar 2024 13:35:35 +0400
++Subject: [PATCH 088/104] apps/pkcs12: Not writing the private key file until
++ the import password is verified
++
++Fixes #904
++
++CLA: trivial
++
++Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/23729)
++
++(cherry picked from commit f5462572a1873482ce38646cbf00dfc483f02068)
++---
++ apps/pkcs12.c | 8 +++++---
++ 1 file changed, 5 insertions(+), 3 deletions(-)
++
++diff --git a/apps/pkcs12.c b/apps/pkcs12.c
++index af4f9fce04..6156be72f7 100644
++--- a/apps/pkcs12.c
+++++ b/apps/pkcs12.c
++@@ -712,9 +712,6 @@ int pkcs12_main(int argc, char **argv)
++     in = bio_open_default(infile, 'r', FORMAT_PKCS12);
++     if (in == NULL)
++         goto end;
++-    out = bio_open_owner(outfile, FORMAT_PEM, private);
++-    if (out == NULL)
++-        goto end;
++ 
++     p12 = PKCS12_init_ex(NID_pkcs7_data, app_get0_libctx(), app_get0_propq());
++     if (p12 == NULL) {
++@@ -814,6 +811,11 @@ int pkcs12_main(int argc, char **argv)
++ 
++  dump:
++     assert(private);
+++
+++    out = bio_open_owner(outfile, FORMAT_PEM, private);
+++    if (out == NULL)
+++        goto end;
+++
++     if (!dump_certs_keys_p12(out, p12, cpass, -1, options, passout, enc)) {
++         BIO_printf(bio_err, "Error outputting keys and certificates\n");
++         ERR_print_errors(bio_err);
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0089-Release-pkey_ctx-on-initialization-failure.patch b/package/libs/openssl/patches/0089-Release-pkey_ctx-on-initialization-failure.patch
+new file mode 100644
+index 0000000..abfe53b
+--- /dev/null
++++ b/package/libs/openssl/patches/0089-Release-pkey_ctx-on-initialization-failure.patch
+@@ -0,0 +1,32 @@
++From 62b684a65e31efc0b85c0a423f51880e149c1c9e Mon Sep 17 00:00:00 2001
++From: irosay <59870261+irosay@users.noreply.github.com>
++Date: Fri, 10 May 2024 17:37:52 +0100
++Subject: [PATCH 089/104] Release pkey_ctx on initialization failure
++
++CLA: trivial
++
++Reviewed-by: Matt Caswell <matt@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24366)
++
++(cherry picked from commit 3e9d933882407a0792dc3466ba9a0d53d40677a7)
++---
++ ssl/statem/statem_srvr.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/ssl/statem/statem_srvr.c b/ssl/statem/statem_srvr.c
++index 6c942e6bce..1a79a5bc37 100644
++--- a/ssl/statem/statem_srvr.c
+++++ b/ssl/statem/statem_srvr.c
++@@ -3134,7 +3134,7 @@ static int tls_process_cke_gost(SSL *s, PACKET *pkt)
++     }
++     if (EVP_PKEY_decrypt_init(pkey_ctx) <= 0) {
++         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
++-        return 0;
+++        goto err;
++     }
++     /*
++      * If client certificate is present and is of the same type, maybe
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0090-test-ssl-tests-Avoid-depending-on-X25519-and-X448-be.patch b/package/libs/openssl/patches/0090-test-ssl-tests-Avoid-depending-on-X25519-and-X448-be.patch
+new file mode 100644
+index 0000000..ae2a50b
+--- /dev/null
++++ b/package/libs/openssl/patches/0090-test-ssl-tests-Avoid-depending-on-X25519-and-X448-be.patch
+@@ -0,0 +1,469 @@
++From 01fe0e7515e310ffa03e1bd735bc70fd459090ac Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Wed, 17 Apr 2024 18:05:35 +0200
++Subject: [PATCH 090/104] test/ssl-tests: Avoid depending on X25519 and X448
++ being fips approved
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tom Cosgrove <tom.cosgrove@arm.com>
++(Merged from https://github.com/openssl/openssl/pull/24348)
++
++(cherry picked from commit 32ca45d3f905d014c44e1570617d96a7372c324d)
++---
++ test/ssl-tests/14-curves.cnf.in      |   7 +-
++ test/ssl-tests/20-cert-select.cnf    | 216 +++++++++++++--------------
++ test/ssl-tests/20-cert-select.cnf.in |  70 ++++-----
++ test/ssl-tests/28-seclevel.cnf.in    |   6 +-
++ 4 files changed, 153 insertions(+), 146 deletions(-)
++
++diff --git a/test/ssl-tests/14-curves.cnf.in b/test/ssl-tests/14-curves.cnf.in
++index 1e003bace0..33201df281 100644
++--- a/test/ssl-tests/14-curves.cnf.in
+++++ b/test/ssl-tests/14-curves.cnf.in
++@@ -12,8 +12,11 @@ use OpenSSL::Test::Utils qw(anydisabled);
++ 
++ our $fips_mode;
++ 
++-my @curves = ("prime256v1", "secp384r1", "secp521r1", "X25519",
++-              "X448");
+++my @curves = ("prime256v1", "secp384r1", "secp521r1");
+++
+++my @curves_no_fips = ("X25519", "X448");
+++
+++push @curves, @curves_no_fips if !$fips_mode;
++ 
++ #Curves *only* suitable for use in TLSv1.3
++ my @curves_tls_1_3 = ("ffdhe2048", "ffdhe3072", "ffdhe4096", "ffdhe6144",
++diff --git a/test/ssl-tests/20-cert-select.cnf b/test/ssl-tests/20-cert-select.cnf
++index 79dcd4c8f4..6888d538ba 100644
++--- a/test/ssl-tests/20-cert-select.cnf
+++++ b/test/ssl-tests/20-cert-select.cnf
++@@ -19,12 +19,12 @@ test-13 = 13-Suite B P-256 Hash Algorithm Selection
++ test-14 = 14-Suite B P-384 Hash Algorithm Selection
++ test-15 = 15-Ed25519 CipherString and Signature Algorithm Selection
++ test-16 = 16-Ed448 CipherString and Signature Algorithm Selection
++-test-17 = 17-Ed25519 CipherString and Curves Selection
++-test-18 = 18-Ed448 CipherString and Curves Selection
++-test-19 = 19-TLS 1.2 Ed25519 Client Auth
++-test-20 = 20-TLS 1.2 Ed448 Client Auth
++-test-21 = 21-ECDSA Signature Algorithm Selection SHA1
++-test-22 = 22-ECDSA with brainpool
+++test-17 = 17-TLS 1.2 Ed25519 Client Auth
+++test-18 = 18-TLS 1.2 Ed448 Client Auth
+++test-19 = 19-ECDSA Signature Algorithm Selection SHA1
+++test-20 = 20-ECDSA with brainpool
+++test-21 = 21-Ed25519 CipherString and Curves Selection
+++test-22 = 22-Ed448 CipherString and Curves Selection
++ test-23 = 23-RSA-PSS Certificate CipherString Selection
++ test-24 = 24-RSA-PSS Certificate Legacy Signature Algorithm Selection
++ test-25 = 25-RSA-PSS Certificate Unified Signature Algorithm Selection
++@@ -602,91 +602,21 @@ ExpectedServerSignType = Ed448
++ 
++ # ===========================================================
++ 
++-[17-Ed25519 CipherString and Curves Selection]
++-ssl_conf = 17-Ed25519 CipherString and Curves Selection-ssl
+++[17-TLS 1.2 Ed25519 Client Auth]
+++ssl_conf = 17-TLS 1.2 Ed25519 Client Auth-ssl
++ 
++-[17-Ed25519 CipherString and Curves Selection-ssl]
++-server = 17-Ed25519 CipherString and Curves Selection-server
++-client = 17-Ed25519 CipherString and Curves Selection-client
+++[17-TLS 1.2 Ed25519 Client Auth-ssl]
+++server = 17-TLS 1.2 Ed25519 Client Auth-server
+++client = 17-TLS 1.2 Ed25519 Client Auth-client
++ 
++-[17-Ed25519 CipherString and Curves Selection-server]
++-Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
++-CipherString = DEFAULT
++-ECDSA.Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
++-ECDSA.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
++-Ed25519.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed25519-cert.pem
++-Ed25519.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed25519-key.pem
++-Ed448.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed448-cert.pem
++-Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed448-key.pem
++-MaxProtocol = TLSv1.2
++-PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++-
++-[17-Ed25519 CipherString and Curves Selection-client]
++-CipherString = aECDSA
++-Curves = X25519
++-MaxProtocol = TLSv1.2
++-SignatureAlgorithms = ECDSA+SHA256:ed25519
++-VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
++-VerifyMode = Peer
++-
++-[test-17]
++-ExpectedResult = Success
++-ExpectedServerCertType = Ed25519
++-ExpectedServerSignType = Ed25519
++-
++-
++-# ===========================================================
++-
++-[18-Ed448 CipherString and Curves Selection]
++-ssl_conf = 18-Ed448 CipherString and Curves Selection-ssl
++-
++-[18-Ed448 CipherString and Curves Selection-ssl]
++-server = 18-Ed448 CipherString and Curves Selection-server
++-client = 18-Ed448 CipherString and Curves Selection-client
++-
++-[18-Ed448 CipherString and Curves Selection-server]
++-Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
++-CipherString = DEFAULT
++-ECDSA.Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
++-ECDSA.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
++-Ed25519.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed25519-cert.pem
++-Ed25519.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed25519-key.pem
++-Ed448.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed448-cert.pem
++-Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed448-key.pem
++-MaxProtocol = TLSv1.2
++-PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++-
++-[18-Ed448 CipherString and Curves Selection-client]
++-CipherString = aECDSA
++-Curves = X448
++-MaxProtocol = TLSv1.2
++-SignatureAlgorithms = ECDSA+SHA256:ed448
++-VerifyCAFile = ${ENV::TEST_CERTS_DIR}/root-ed448-cert.pem
++-VerifyMode = Peer
++-
++-[test-18]
++-ExpectedResult = Success
++-ExpectedServerCertType = Ed448
++-ExpectedServerSignType = Ed448
++-
++-
++-# ===========================================================
++-
++-[19-TLS 1.2 Ed25519 Client Auth]
++-ssl_conf = 19-TLS 1.2 Ed25519 Client Auth-ssl
++-
++-[19-TLS 1.2 Ed25519 Client Auth-ssl]
++-server = 19-TLS 1.2 Ed25519 Client Auth-server
++-client = 19-TLS 1.2 Ed25519 Client Auth-client
++-
++-[19-TLS 1.2 Ed25519 Client Auth-server]
+++[17-TLS 1.2 Ed25519 Client Auth-server]
++ Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
++ CipherString = DEFAULT
++ PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
++ VerifyMode = Require
++ 
++-[19-TLS 1.2 Ed25519 Client Auth-client]
+++[17-TLS 1.2 Ed25519 Client Auth-client]
++ CipherString = DEFAULT
++ Ed25519.Certificate = ${ENV::TEST_CERTS_DIR}/client-ed25519-cert.pem
++ Ed25519.PrivateKey = ${ENV::TEST_CERTS_DIR}/client-ed25519-key.pem
++@@ -695,7 +625,7 @@ MinProtocol = TLSv1.2
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
++ VerifyMode = Peer
++ 
++-[test-19]
+++[test-17]
++ ExpectedClientCertType = Ed25519
++ ExpectedClientSignType = Ed25519
++ ExpectedResult = Success
++@@ -703,21 +633,21 @@ ExpectedResult = Success
++ 
++ # ===========================================================
++ 
++-[20-TLS 1.2 Ed448 Client Auth]
++-ssl_conf = 20-TLS 1.2 Ed448 Client Auth-ssl
+++[18-TLS 1.2 Ed448 Client Auth]
+++ssl_conf = 18-TLS 1.2 Ed448 Client Auth-ssl
++ 
++-[20-TLS 1.2 Ed448 Client Auth-ssl]
++-server = 20-TLS 1.2 Ed448 Client Auth-server
++-client = 20-TLS 1.2 Ed448 Client Auth-client
+++[18-TLS 1.2 Ed448 Client Auth-ssl]
+++server = 18-TLS 1.2 Ed448 Client Auth-server
+++client = 18-TLS 1.2 Ed448 Client Auth-client
++ 
++-[20-TLS 1.2 Ed448 Client Auth-server]
+++[18-TLS 1.2 Ed448 Client Auth-server]
++ Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
++ CipherString = DEFAULT
++ PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
++ VerifyMode = Require
++ 
++-[20-TLS 1.2 Ed448 Client Auth-client]
+++[18-TLS 1.2 Ed448 Client Auth-client]
++ CipherString = DEFAULT
++ Ed448.Certificate = ${ENV::TEST_CERTS_DIR}/client-ed448-cert.pem
++ Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/client-ed448-key.pem
++@@ -726,7 +656,7 @@ MinProtocol = TLSv1.2
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
++ VerifyMode = Peer
++ 
++-[test-20]
+++[test-18]
++ ExpectedClientCertType = Ed448
++ ExpectedClientSignType = Ed448
++ ExpectedResult = Success
++@@ -734,14 +664,14 @@ ExpectedResult = Success
++ 
++ # ===========================================================
++ 
++-[21-ECDSA Signature Algorithm Selection SHA1]
++-ssl_conf = 21-ECDSA Signature Algorithm Selection SHA1-ssl
+++[19-ECDSA Signature Algorithm Selection SHA1]
+++ssl_conf = 19-ECDSA Signature Algorithm Selection SHA1-ssl
++ 
++-[21-ECDSA Signature Algorithm Selection SHA1-ssl]
++-server = 21-ECDSA Signature Algorithm Selection SHA1-server
++-client = 21-ECDSA Signature Algorithm Selection SHA1-client
+++[19-ECDSA Signature Algorithm Selection SHA1-ssl]
+++server = 19-ECDSA Signature Algorithm Selection SHA1-server
+++client = 19-ECDSA Signature Algorithm Selection SHA1-client
++ 
++-[21-ECDSA Signature Algorithm Selection SHA1-server]
+++[19-ECDSA Signature Algorithm Selection SHA1-server]
++ Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
++ CipherString = DEFAULT:@SECLEVEL=0
++ ECDSA.Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
++@@ -753,13 +683,13 @@ Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed448-key.pem
++ MaxProtocol = TLSv1.2
++ PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
++ 
++-[21-ECDSA Signature Algorithm Selection SHA1-client]
+++[19-ECDSA Signature Algorithm Selection SHA1-client]
++ CipherString = DEFAULT:@SECLEVEL=0
++ SignatureAlgorithms = ECDSA+SHA1
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
++ VerifyMode = Peer
++ 
++-[test-21]
+++[test-19]
++ ExpectedResult = Success
++ ExpectedServerCertType = P-256
++ ExpectedServerSignHash = SHA1
++@@ -768,20 +698,20 @@ ExpectedServerSignType = EC
++ 
++ # ===========================================================
++ 
++-[22-ECDSA with brainpool]
++-ssl_conf = 22-ECDSA with brainpool-ssl
+++[20-ECDSA with brainpool]
+++ssl_conf = 20-ECDSA with brainpool-ssl
++ 
++-[22-ECDSA with brainpool-ssl]
++-server = 22-ECDSA with brainpool-server
++-client = 22-ECDSA with brainpool-client
+++[20-ECDSA with brainpool-ssl]
+++server = 20-ECDSA with brainpool-server
+++client = 20-ECDSA with brainpool-client
++ 
++-[22-ECDSA with brainpool-server]
+++[20-ECDSA with brainpool-server]
++ Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-cert.pem
++ CipherString = DEFAULT
++ Groups = brainpoolP256r1
++ PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-brainpoolP256r1-key.pem
++ 
++-[22-ECDSA with brainpool-client]
+++[20-ECDSA with brainpool-client]
++ CipherString = aECDSA
++ Groups = brainpoolP256r1
++ MaxProtocol = TLSv1.2
++@@ -789,13 +719,83 @@ RequestCAFile = ${ENV::TEST_CERTS_DIR}/root-cert.pem
++ VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
++ VerifyMode = Peer
++ 
++-[test-22]
+++[test-20]
++ ExpectedResult = Success
++ ExpectedServerCANames = empty
++ ExpectedServerCertType = brainpoolP256r1
++ ExpectedServerSignType = EC
++ 
++ 
+++# ===========================================================
+++
+++[21-Ed25519 CipherString and Curves Selection]
+++ssl_conf = 21-Ed25519 CipherString and Curves Selection-ssl
+++
+++[21-Ed25519 CipherString and Curves Selection-ssl]
+++server = 21-Ed25519 CipherString and Curves Selection-server
+++client = 21-Ed25519 CipherString and Curves Selection-client
+++
+++[21-Ed25519 CipherString and Curves Selection-server]
+++Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
+++CipherString = DEFAULT
+++ECDSA.Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
+++ECDSA.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
+++Ed25519.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed25519-cert.pem
+++Ed25519.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed25519-key.pem
+++Ed448.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed448-cert.pem
+++Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed448-key.pem
+++MaxProtocol = TLSv1.2
+++PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
+++
+++[21-Ed25519 CipherString and Curves Selection-client]
+++CipherString = aECDSA
+++Curves = X25519
+++MaxProtocol = TLSv1.2
+++SignatureAlgorithms = ECDSA+SHA256:ed25519
+++VerifyCAFile = ${ENV::TEST_CERTS_DIR}/rootcert.pem
+++VerifyMode = Peer
+++
+++[test-21]
+++ExpectedResult = Success
+++ExpectedServerCertType = Ed25519
+++ExpectedServerSignType = Ed25519
+++
+++
+++# ===========================================================
+++
+++[22-Ed448 CipherString and Curves Selection]
+++ssl_conf = 22-Ed448 CipherString and Curves Selection-ssl
+++
+++[22-Ed448 CipherString and Curves Selection-ssl]
+++server = 22-Ed448 CipherString and Curves Selection-server
+++client = 22-Ed448 CipherString and Curves Selection-client
+++
+++[22-Ed448 CipherString and Curves Selection-server]
+++Certificate = ${ENV::TEST_CERTS_DIR}/servercert.pem
+++CipherString = DEFAULT
+++ECDSA.Certificate = ${ENV::TEST_CERTS_DIR}/server-ecdsa-cert.pem
+++ECDSA.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ecdsa-key.pem
+++Ed25519.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed25519-cert.pem
+++Ed25519.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed25519-key.pem
+++Ed448.Certificate = ${ENV::TEST_CERTS_DIR}/server-ed448-cert.pem
+++Ed448.PrivateKey = ${ENV::TEST_CERTS_DIR}/server-ed448-key.pem
+++MaxProtocol = TLSv1.2
+++PrivateKey = ${ENV::TEST_CERTS_DIR}/serverkey.pem
+++
+++[22-Ed448 CipherString and Curves Selection-client]
+++CipherString = aECDSA
+++Curves = X448
+++MaxProtocol = TLSv1.2
+++SignatureAlgorithms = ECDSA+SHA256:ed448
+++VerifyCAFile = ${ENV::TEST_CERTS_DIR}/root-ed448-cert.pem
+++VerifyMode = Peer
+++
+++[test-22]
+++ExpectedResult = Success
+++ExpectedServerCertType = Ed448
+++ExpectedServerSignType = Ed448
+++
+++
++ # ===========================================================
++ 
++ [23-RSA-PSS Certificate CipherString Selection]
++diff --git a/test/ssl-tests/20-cert-select.cnf.in b/test/ssl-tests/20-cert-select.cnf.in
++index 30cde592c6..435932c4c1 100644
++--- a/test/ssl-tests/20-cert-select.cnf.in
+++++ b/test/ssl-tests/20-cert-select.cnf.in
++@@ -328,41 +328,6 @@ our @tests = (
++             "ExpectedResult" => "Success"
++         },
++     },
++-    {
++-        name => "Ed25519 CipherString and Curves Selection",
++-        server => $server,
++-        client => {
++-            "CipherString" => "aECDSA",
++-            "MaxProtocol" => "TLSv1.2",
++-            "SignatureAlgorithms" => "ECDSA+SHA256:ed25519",
++-            # Excluding P-256 from the supported curves list means server
++-            # certificate should be Ed25519 and not P-256
++-            "Curves" => "X25519"
++-        },
++-        test   => {
++-            "ExpectedServerCertType" =>, "Ed25519",
++-            "ExpectedServerSignType" =>, "Ed25519",
++-            "ExpectedResult" => "Success"
++-        },
++-    },
++-    {
++-        name => "Ed448 CipherString and Curves Selection",
++-        server => $server,
++-        client => {
++-            "CipherString" => "aECDSA",
++-            "MaxProtocol" => "TLSv1.2",
++-            "SignatureAlgorithms" => "ECDSA+SHA256:ed448",
++-            "VerifyCAFile" => test_pem("root-ed448-cert.pem"),
++-            # Excluding P-256 from the supported curves list means server
++-            # certificate should be Ed25519 and not P-256
++-            "Curves" => "X448"
++-        },
++-        test   => {
++-            "ExpectedServerCertType" =>, "Ed448",
++-            "ExpectedServerSignType" =>, "Ed448",
++-            "ExpectedResult" => "Success"
++-        },
++-    },
++     {
++         name => "TLS 1.2 Ed25519 Client Auth",
++         server => {
++@@ -446,6 +411,41 @@ my @tests_non_fips = (
++             "ExpectedResult" => "Success"
++         },
++     },
+++    {
+++        name => "Ed25519 CipherString and Curves Selection",
+++        server => $server,
+++        client => {
+++            "CipherString" => "aECDSA",
+++            "MaxProtocol" => "TLSv1.2",
+++            "SignatureAlgorithms" => "ECDSA+SHA256:ed25519",
+++            # Excluding P-256 from the supported curves list means server
+++            # certificate should be Ed25519 and not P-256
+++            "Curves" => "X25519"
+++        },
+++        test   => {
+++            "ExpectedServerCertType" =>, "Ed25519",
+++            "ExpectedServerSignType" =>, "Ed25519",
+++            "ExpectedResult" => "Success"
+++        },
+++    },
+++    {
+++        name => "Ed448 CipherString and Curves Selection",
+++        server => $server,
+++        client => {
+++            "CipherString" => "aECDSA",
+++            "MaxProtocol" => "TLSv1.2",
+++            "SignatureAlgorithms" => "ECDSA+SHA256:ed448",
+++            "VerifyCAFile" => test_pem("root-ed448-cert.pem"),
+++            # Excluding P-256 from the supported curves list means server
+++            # certificate should be Ed25519 and not P-256
+++            "Curves" => "X448"
+++        },
+++        test   => {
+++            "ExpectedServerCertType" =>, "Ed448",
+++            "ExpectedServerSignType" =>, "Ed448",
+++            "ExpectedResult" => "Success"
+++        },
+++    },
++ );
++ 
++ my @tests_pss = (
++diff --git a/test/ssl-tests/28-seclevel.cnf.in b/test/ssl-tests/28-seclevel.cnf.in
++index 945f4599d1..33e885a59c 100644
++--- a/test/ssl-tests/28-seclevel.cnf.in
+++++ b/test/ssl-tests/28-seclevel.cnf.in
++@@ -56,7 +56,10 @@ our @tests_ec = (
++         client => { "CipherString" => "DEFAULT:\@SECLEVEL=5",
++                     "VerifyCAFile" => test_pem("root-ed448-cert.pem") },
++         test   => { "ExpectedResult" => "ServerFail" },
++-    },
+++    }
+++);
+++
+++our @tests_ec_non_fips = (
++     {
++         name => "SECLEVEL 3 with P-384 key, X25519 ECDHE",
++         server => { "CipherString" => "DEFAULT:\@SECLEVEL=3",
++@@ -81,5 +84,6 @@ our @tests_tls1_2 = (
++     },
++ );
++ 
+++push @tests_ec, @tests_ec_non_fips unless $fips_mode;
++ push @tests, @tests_ec unless disabled("ec");
++ push @tests, @tests_tls1_2 unless disabled("tls1_2") || disabled("ec");
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0091-sslapitest.c-With-fips-skip-tests-depending-on-X2551.patch b/package/libs/openssl/patches/0091-sslapitest.c-With-fips-skip-tests-depending-on-X2551.patch
+new file mode 100644
+index 0000000..71818c6
+--- /dev/null
++++ b/package/libs/openssl/patches/0091-sslapitest.c-With-fips-skip-tests-depending-on-X2551.patch
+@@ -0,0 +1,47 @@
++From d80296df203ed3f311556f15a591164ec38a5820 Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Thu, 9 May 2024 10:48:56 +0200
++Subject: [PATCH 091/104] sslapitest.c: With fips skip tests depending on
++ X25519 and X448
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tom Cosgrove <tom.cosgrove@arm.com>
++(Merged from https://github.com/openssl/openssl/pull/24347)
++
++(cherry picked from commit f6e469808501f52c7e8f8679d6c3290cf1c258b3)
++---
++ test/sslapitest.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/test/sslapitest.c b/test/sslapitest.c
++index 376d5ddc4d..28bc94d672 100644
++--- a/test/sslapitest.c
+++++ b/test/sslapitest.c
++@@ -4907,10 +4907,14 @@ static int test_key_exchange(int idx)
++             kexch_name0 = "secp521r1";
++             break;
++         case 4:
+++            if (is_fips)
+++                return TEST_skip("X25519 might not be supported by fips provider.");
++             kexch_alg = NID_X25519;
++             kexch_name0 = "x25519";
++             break;
++         case 5:
+++            if (is_fips)
+++                return TEST_skip("X448 might not be supported by fips provider.");
++             kexch_alg = NID_X448;
++             kexch_name0 = "x448";
++             break;
++@@ -5125,6 +5129,9 @@ static int test_negotiated_group(int idx)
++     else
++         expectednid = kexch_alg;
++ 
+++    if (is_fips && (kexch_alg == NID_X25519 || kexch_alg == NID_X448))
+++        return TEST_skip("X25519 and X448 might not be available in fips provider.");
+++
++     if (!istls13)
++         max_version = TLS1_2_VERSION;
++ 
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0092-fix-sm2-encryption-implementation-bug.patch b/package/libs/openssl/patches/0092-fix-sm2-encryption-implementation-bug.patch
+new file mode 100644
+index 0000000..dde38dd
+--- /dev/null
++++ b/package/libs/openssl/patches/0092-fix-sm2-encryption-implementation-bug.patch
+@@ -0,0 +1,101 @@
++From 96390f92c6b62d2b69bd2861c6b78c1ae2cfb0cb Mon Sep 17 00:00:00 2001
++From: Liu-Ermeng <liuermeng2@huawei.com>
++Date: Sun, 7 Jan 2024 20:01:29 -0800
++Subject: [PATCH 092/104] fix sm2 encryption implementation bug.
++
++According to the "GB/T 32918.4-2016"
++section 6.1 encryption, step A5:
++If result of the "KDF" is all zeros, we should go back to
++the begin(step A1).
++
++section 7.1 decryption, step B4:
++If result of the "KDF" is all zeros, we should raise error and exit.
++
++Signed-off-by: Liu-Ermeng <liuermeng2@huawei.com>
++
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/23210)
++
++(cherry picked from commit 170620675dfd74f34bdcf8aba71dffeb07f3d533)
++---
++ crypto/sm2/sm2_crypt.c | 35 +++++++++++++++++++++++++++++------
++ 1 file changed, 29 insertions(+), 6 deletions(-)
++
++diff --git a/crypto/sm2/sm2_crypt.c b/crypto/sm2/sm2_crypt.c
++index 5318c6199f..0e3f2d975d 100644
++--- a/crypto/sm2/sm2_crypt.c
+++++ b/crypto/sm2/sm2_crypt.c
++@@ -67,6 +67,18 @@ static size_t ec_field_size(const EC_GROUP *group)
++     return field_size;
++ }
++ 
+++static int is_all_zeros(const unsigned char *msg, size_t msglen)
+++{
+++    unsigned char re = 0;
+++    size_t i;
+++
+++    for (i = 0; i < msglen; i++) {
+++        re |= msg[i];
+++    }
+++
+++    return re == 0 ? 1 : 0;
+++}
+++
++ int ossl_sm2_plaintext_size(const unsigned char *ct, size_t ct_size,
++                             size_t *pt_size)
++ {
++@@ -179,6 +191,13 @@ int ossl_sm2_encrypt(const EC_KEY *key,
++ 
++     memset(ciphertext_buf, 0, *ciphertext_len);
++ 
+++    msg_mask = OPENSSL_zalloc(msg_len);
+++    if (msg_mask == NULL) {
+++       ERR_raise(ERR_LIB_SM2, ERR_R_MALLOC_FAILURE);
+++       goto done;
+++    }
+++
+++again:
++     if (!BN_priv_rand_range_ex(k, order, 0, ctx)) {
++         ERR_raise(ERR_LIB_SM2, ERR_R_INTERNAL_ERROR);
++         goto done;
++@@ -198,12 +217,6 @@ int ossl_sm2_encrypt(const EC_KEY *key,
++         goto done;
++     }
++ 
++-    msg_mask = OPENSSL_zalloc(msg_len);
++-    if (msg_mask == NULL) {
++-       ERR_raise(ERR_LIB_SM2, ERR_R_MALLOC_FAILURE);
++-       goto done;
++-   }
++-
++     /* X9.63 with no salt happens to match the KDF used in SM2 */
++     if (!ossl_ecdh_kdf_X9_63(msg_mask, msg_len, x2y2, 2 * field_size, NULL, 0,
++                              digest, libctx, propq)) {
++@@ -211,6 +224,11 @@ int ossl_sm2_encrypt(const EC_KEY *key,
++         goto done;
++     }
++ 
+++    if (is_all_zeros(msg_mask, msg_len)) {
+++        memset(x2y2, 0, 2 * field_size);
+++        goto again;
+++    }
+++
++     for (i = 0; i != msg_len; ++i)
++         msg_mask[i] ^= msg[i];
++ 
++@@ -364,6 +382,11 @@ int ossl_sm2_decrypt(const EC_KEY *key,
++         goto done;
++     }
++ 
+++    if (is_all_zeros(msg_mask, msg_len)) {
+++        ERR_raise(ERR_LIB_SM2, SM2_R_INVALID_ENCODING);
+++        goto done;
+++    }
+++
++     for (i = 0; i != msg_len; ++i)
++         ptext_buf[i] = C2[i] ^ msg_mask[i];
++ 
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0093-Docs-SSL_CTX_set_cert_store-ownership-of-store.patch b/package/libs/openssl/patches/0093-Docs-SSL_CTX_set_cert_store-ownership-of-store.patch
+new file mode 100644
+index 0000000..6dd1b5f
+--- /dev/null
++++ b/package/libs/openssl/patches/0093-Docs-SSL_CTX_set_cert_store-ownership-of-store.patch
+@@ -0,0 +1,32 @@
++From d2b2ebdbac0d588967ff4178fd1165c072e70708 Mon Sep 17 00:00:00 2001
++From: Ruslan Baratov <x@ruslo.dev>
++Date: Sun, 12 May 2024 16:33:59 +0800
++Subject: [PATCH 093/104] [Docs] 'SSL_CTX_set_cert_store' ownership of 'store'
++
++Reviewed-by: Matt Caswell <matt@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24375)
++
++(cherry picked from commit 987baef4fa54d268d7eaa93837a56398409698a1)
++---
++ doc/man3/SSL_CTX_set_cert_store.pod | 4 +++-
++ 1 file changed, 3 insertions(+), 1 deletion(-)
++
++diff --git a/doc/man3/SSL_CTX_set_cert_store.pod b/doc/man3/SSL_CTX_set_cert_store.pod
++index f1fef9e649..792d7c3faa 100644
++--- a/doc/man3/SSL_CTX_set_cert_store.pod
+++++ b/doc/man3/SSL_CTX_set_cert_store.pod
++@@ -16,7 +16,9 @@ SSL_CTX_set_cert_store, SSL_CTX_set1_cert_store, SSL_CTX_get_cert_store - manipu
++ 
++ SSL_CTX_set_cert_store() sets/replaces the certificate verification storage
++ of B<ctx> to/with B<store>. If another X509_STORE object is currently
++-set in B<ctx>, it will be X509_STORE_free()ed.
+++set in B<ctx>, it will be X509_STORE_free()ed. SSL_CTX_set_cert_store() will
+++take ownership of the B<store>, i.e., the call C<X509_STORE_free(store)> is no
+++longer needed.
++ 
++ SSL_CTX_set1_cert_store() sets/replaces the certificate verification storage
++ of B<ctx> to/with B<store>. The B<store>'s reference count is incremented.
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0094-Update-openssl-smime.pod.in.patch b/package/libs/openssl/patches/0094-Update-openssl-smime.pod.in.patch
+new file mode 100644
+index 0000000..91dae69
+--- /dev/null
++++ b/package/libs/openssl/patches/0094-Update-openssl-smime.pod.in.patch
+@@ -0,0 +1,59 @@
++From d4b119c567cb5dcaf83add7ca2ea1d646eb3ef9f Mon Sep 17 00:00:00 2001
++From: DominikN <github@t-rash.de>
++Date: Fri, 5 Apr 2024 23:06:41 +0200
++Subject: [PATCH 094/104] Update openssl-smime.pod.in
++
++Remove duplicate entries for -nocerts and -noattr
++
++CLA:trivial
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24052)
++
++(cherry picked from commit 5a0c92cf093b4f0aa65f4fdbff88d7bdc83491f3)
++---
++ doc/man1/openssl-smime.pod.in | 16 ++++------------
++ 1 file changed, 4 insertions(+), 12 deletions(-)
++
++diff --git a/doc/man1/openssl-smime.pod.in b/doc/man1/openssl-smime.pod.in
++index e438c866c3..78f51f9fde 100644
++--- a/doc/man1/openssl-smime.pod.in
+++++ b/doc/man1/openssl-smime.pod.in
++@@ -195,14 +195,14 @@ Don't try to verify the signatures on the message.
++ 
++ =item B<-nocerts>
++ 
++-When signing a message the signer's certificate is normally included
++-with this option it is excluded. This will reduce the size of the
++-signed message but the verifier must have a copy of the signers certificate
+++When signing a message, the signer's certificate is normally included.
+++With this option it is excluded. This will reduce the size of the
+++signed message, but the verifier must have a copy of the signers certificate
++ available locally (passed using the B<-certfile> option for example).
++ 
++ =item B<-noattr>
++ 
++-Normally when a message is signed a set of attributes are included which
+++Normally, when a message is signed, a set of attributes are included which
++ include the signing time and supported symmetric algorithms. With this
++ option they are not included.
++ 
++@@ -243,14 +243,6 @@ used multiple times if more than one signer is required. If a message is being
++ verified then the signers certificates will be written to this file if the
++ verification was successful.
++ 
++-=item B<-nocerts>
++-
++-Don't include signers certificate when signing.
++-
++-=item B<-noattr>
++-
++-Don't include any signed attributes when signing.
++-
++ =item B<-recip> I<file>
++ 
++ The recipients certificate when decrypting a message. This certificate
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0095-Check-DSA-parameters-for-excessive-sizes-before-vali.patch b/package/libs/openssl/patches/0095-Check-DSA-parameters-for-excessive-sizes-before-vali.patch
+new file mode 100644
+index 0000000..fe30291
+--- /dev/null
++++ b/package/libs/openssl/patches/0095-Check-DSA-parameters-for-excessive-sizes-before-vali.patch
+@@ -0,0 +1,204 @@
++From 3559e868e58005d15c6013a0c1fd832e51c73397 Mon Sep 17 00:00:00 2001
++From: Tomas Mraz <tomas@openssl.org>
++Date: Wed, 8 May 2024 15:23:45 +0200
++Subject: [PATCH 095/104] Check DSA parameters for excessive sizes before
++ validating
++
++This avoids overly long computation of various validation
++checks.
++
++Fixes CVE-2024-4603
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Matt Caswell <matt@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Shane Lontis <shane.lontis@oracle.com>
++(Merged from https://github.com/openssl/openssl/pull/24346)
++
++(cherry picked from commit 85ccbab216da245cf9a6503dd327072f21950d9b)
++---
++ CHANGES.md                                    | 17 ++++++
++ crypto/dsa/dsa_check.c                        | 44 ++++++++++++--
++ .../invalid/p10240_q256_too_big.pem           | 57 +++++++++++++++++++
++ 3 files changed, 114 insertions(+), 4 deletions(-)
++ create mode 100644 test/recipes/15-test_dsaparam_data/invalid/p10240_q256_too_big.pem
++
++diff --git a/CHANGES.md b/CHANGES.md
++index 5590704670..16913a049b 100644
++--- a/CHANGES.md
+++++ b/CHANGES.md
++@@ -30,6 +30,23 @@ breaking changes, and mappings for the large list of deprecated functions.
++ 
++ ### Changes between 3.0.13 and 3.0.14 [xx XXX xxxx]
++ 
+++ * Fixed an issue where checking excessively long DSA keys or parameters may
+++   be very slow.
+++
+++   Applications that use the functions EVP_PKEY_param_check() or
+++   EVP_PKEY_public_check() to check a DSA public key or DSA parameters may
+++   experience long delays. Where the key or parameters that are being checked
+++   have been obtained from an untrusted source this may lead to a Denial of
+++   Service.
+++
+++   To resolve this issue DSA keys larger than OPENSSL_DSA_MAX_MODULUS_BITS
+++   will now fail the check immediately with a DSA_R_MODULUS_TOO_LARGE error
+++   reason.
+++
+++   ([CVE-2024-4603])
+++
+++   *Tomáš Mráz*
+++
++  * Fixed an issue where some non-default TLS server configurations can cause
++    unbounded memory growth when processing TLSv1.3 sessions. An attacker may
++    exploit certain server configurations to trigger unbounded memory growth that
++diff --git a/crypto/dsa/dsa_check.c b/crypto/dsa/dsa_check.c
++index fb0e9129a2..122449a7bf 100644
++--- a/crypto/dsa/dsa_check.c
+++++ b/crypto/dsa/dsa_check.c
++@@ -19,8 +19,34 @@
++ #include "dsa_local.h"
++ #include "crypto/dsa.h"
++ 
+++static int dsa_precheck_params(const DSA *dsa, int *ret)
+++{
+++    if (dsa->params.p == NULL || dsa->params.q == NULL) {
+++        ERR_raise(ERR_LIB_DSA, DSA_R_BAD_FFC_PARAMETERS);
+++        *ret = FFC_CHECK_INVALID_PQ;
+++        return 0;
+++    }
+++
+++    if (BN_num_bits(dsa->params.p) > OPENSSL_DSA_MAX_MODULUS_BITS) {
+++        ERR_raise(ERR_LIB_DSA, DSA_R_MODULUS_TOO_LARGE);
+++        *ret = FFC_CHECK_INVALID_PQ;
+++        return 0;
+++    }
+++
+++    if (BN_num_bits(dsa->params.q) >= BN_num_bits(dsa->params.p)) {
+++        ERR_raise(ERR_LIB_DSA, DSA_R_BAD_Q_VALUE);
+++        *ret = FFC_CHECK_INVALID_PQ;
+++        return 0;
+++    }
+++
+++    return 1;
+++}
+++
++ int ossl_dsa_check_params(const DSA *dsa, int checktype, int *ret)
++ {
+++    if (!dsa_precheck_params(dsa, ret))
+++        return 0;
+++
++     if (checktype == OSSL_KEYMGMT_VALIDATE_QUICK_CHECK)
++         return ossl_ffc_params_simple_validate(dsa->libctx, &dsa->params,
++                                                FFC_PARAM_TYPE_DSA, ret);
++@@ -39,6 +65,9 @@ int ossl_dsa_check_params(const DSA *dsa, int checktype, int *ret)
++  */
++ int ossl_dsa_check_pub_key(const DSA *dsa, const BIGNUM *pub_key, int *ret)
++ {
+++    if (!dsa_precheck_params(dsa, ret))
+++        return 0;
+++
++     return ossl_ffc_validate_public_key(&dsa->params, pub_key, ret)
++            && *ret == 0;
++ }
++@@ -50,6 +79,9 @@ int ossl_dsa_check_pub_key(const DSA *dsa, const BIGNUM *pub_key, int *ret)
++  */
++ int ossl_dsa_check_pub_key_partial(const DSA *dsa, const BIGNUM *pub_key, int *ret)
++ {
+++    if (!dsa_precheck_params(dsa, ret))
+++        return 0;
+++
++     return ossl_ffc_validate_public_key_partial(&dsa->params, pub_key, ret)
++            && *ret == 0;
++ }
++@@ -58,8 +90,10 @@ int ossl_dsa_check_priv_key(const DSA *dsa, const BIGNUM *priv_key, int *ret)
++ {
++     *ret = 0;
++ 
++-    return (dsa->params.q != NULL
++-            && ossl_ffc_validate_private_key(dsa->params.q, priv_key, ret));
+++    if (!dsa_precheck_params(dsa, ret))
+++        return 0;
+++
+++    return ossl_ffc_validate_private_key(dsa->params.q, priv_key, ret);
++ }
++ 
++ /*
++@@ -72,8 +106,10 @@ int ossl_dsa_check_pairwise(const DSA *dsa)
++     BN_CTX *ctx = NULL;
++     BIGNUM *pub_key = NULL;
++ 
++-    if (dsa->params.p == NULL
++-        || dsa->params.g == NULL
+++    if (!dsa_precheck_params(dsa, &ret))
+++        return 0;
+++
+++    if (dsa->params.g == NULL
++         || dsa->priv_key == NULL
++         || dsa->pub_key == NULL)
++         return 0;
++diff --git a/test/recipes/15-test_dsaparam_data/invalid/p10240_q256_too_big.pem b/test/recipes/15-test_dsaparam_data/invalid/p10240_q256_too_big.pem
++new file mode 100644
++index 0000000000..e85e2953b7
++--- /dev/null
+++++ b/test/recipes/15-test_dsaparam_data/invalid/p10240_q256_too_big.pem
++@@ -0,0 +1,57 @@
+++-----BEGIN DSA PARAMETERS-----
+++MIIKLAKCBQEAym47LzPFZdbz16WvjczLKuzLtsP8yRk/exxL4bBthJhP1qOwctja
+++p1586SF7gDxCMn7yWVEYdfRbFefGoq0gj1XOE917XqlbnkmZhMgxut2KbNJo/xil
+++XNFUjGvKs3F413U9rAodC8f07cWHP1iTcWL+vPe6u2yilKWYYfnLWHQH+Z6aPrrF
+++x/R08LI6DZ6nEsIo+hxaQnEtx+iqNTJC6Q1RIjWDqxQkFVTkJ0Y7miRDXmRdneWk
+++oLrMZRpaXr5l5tSjEghh1pBgJcdyOv0lh4dlDy/alAiqE2Qlb667yHl6A9dDPlpW
+++dAntpffy4LwOxfbuEhISvKjjQoBwIvYE4TBPqL0Q6bC6HgQ4+tqd9b44pQjdIQjb
+++Xcjc6azheITSnPEex3OdKtKoQeRq01qCeLBpMXu1c+CTf4ApKArZvT3vZSg0hM1O
+++pR71bRZrEEegDj0LH2HCgI5W6H3blOS9A0kUTddCoQXr2lsVdiPtRbPKH1gcd9FQ
+++P8cGrvbakpTiC0dCczOMDaCteM1QNILlkM7ZoV6VghsKvDnFPxFsiIr5GgjasXP5
+++hhbn3g7sDoq1LiTEo+IKQY28pBWx7etSOSRuXW/spnvCkivZla7lSEGljoy9QlQ2
+++UZmsEQI9G3YyzgpxHvKZBK1CiZVTywdYKTZ4TYCxvqzhYhjv2bqbpjI12HRFLojB
+++koyEmMSp53lldCzp158PrIanqSp2rksMR8SmmCL3FwfAp2OjqFMEglG9DT8x0WaN
+++TLSkjGC6t2csMte7WyU1ekNoFDKfMjDSAz0+xIx21DEmZtYqFOg1DNPK1xYLS0pl
+++RSMRRkJVN2mk/G7/1oxlB8Wb9wgi3GKUqqCYT11SnBjzq0NdoJ3E4GMedp5Lx3AZ
+++4mFuRPUd4iV86tE0XDSHSFE7Y3ZkrOjD7Q/26/L53L/UH5z4HW6CHP5os7QERJjg
+++c1S3x87wXWo9QXbB9b2xmf+c+aWwAAr1cviw38tru58jF3/IGyduj9H8claKQqBG
+++cIOUF4aNe1hK2K3ArAOApUxr4KE+tCvrltRfiTmVFip0g9Jt1CPY3Zu7Bd4Z2ZkE
+++DtSztpwa49HrWF5E9xpquvBL2U8jQ68E7Xd8Wp4orI/TIChriamBmdkgRz3H2LvN
+++Ozb6+hsnEGrz3sp2RVAToSqA9ysa6nHZdfufPNtMEbQdO/k1ehmGRb0ljBRsO6b2
+++rsG2eYuC8tg8eCrIkua0TGRI7g6a4K32AJdzaX6NsISaaIW+OYJuoDSscvD3oOg8
+++PPEhU+zM7xJskTA+jxvPlikKx8V7MNHOCQECldJlUBwzJvqp40JvwfnDsF+8VYwd
+++UaiieR3pzMzyTjpReXRmZbnRPusRcsVzxb2OhB79wmuy4UPjjQBX+7eD0rs8xxvW
+++5a5q1Cjq4AvbwmmcA/wDrHDOjcbD/zodad2O1QtBWa/R4xyWea4zKsflgACE1zY9
+++wW2br7+YQFekcrXkkkEzgxd6zxv8KVEDpXRZjmAM1cI5LvkoN64To4GedN8Qe/G7
+++R9SZh9gnS17PTP64hK+aYqhFafMdu87q/+qLfxaSux727qE5hiW01u4nnWhACf9s
+++xuOozowKqxZxkolMIyZv6Lddwy1Zv5qjCyd0DvM/1skpXWkb9kfabYC+OhjsjVhs
+++0Ktfs6a5B3eixiw5x94hhIcTEcS4hmvhGUL72FiTca6ZeSERTKmNBy8CIQC9/ZUN
+++uU/V5JTcnYyUGHzm7+XcZBjyGBagBj9rCmW3SQKCBQAJ/k9rb39f1cO+/3XDEMjy
+++9bIEXSuS48g5RAc1UGd5nrrBQwuDxGWFyz0yvAY7LgyidZuJS21+MAp9EY7AOMmx
+++TDttifNaBJYt4GZ8of166PcqTKkHQwq5uBpxeSDv/ZE8YbYfaCtLTcUC8KlO+l36
+++gjJHSkdkflSsGy1yObSNDQDfVAAwQs//TjDMnuEtvlNXZllsTvFFBceXVETn10K2
+++ZMmdSIJNfLnjReUKEN6PfeGqv7F4xoyGwUybEfRE4u5RmXrqCODaIjY3SNMrOq8B
+++R3Ata/cCozsM1jIdIW2z+OybDJH+BYsYm2nkSZQjZS6javTYClLrntEKG/hAQwL8
+++F16YLOQXpHhgiAaWnTZzANtLppB2+5qCVy5ElzKongOwT8JTjTFXOaRnqe/ngm9W
+++SSbrxfDaoWUOyK9XD8Cydzpv3n4Y8nWNGayi7/yAFCU36Ri040ufgv/TZLuKacnl
++++3ga3ZUpRlSigzx0kb1+KjTSWeQ8vE/psdWjvBukVEbzdUauMLyRLo/6znSVvvPX
+++UGhviThE5uhrsUg+wEPFINriSHfF7JDKVhDcJnLBdaXvfN52pkF/naLBF5Rt3Gvq
+++fjCxjx0Sy9Lag1hDN4dor7dzuO7wmwOS01DJW1PtNLuuH0Bbqh1kYSaQkmyXBZWX
+++qo8K3nkoDM0niOtJJubOhTNrGmSaZpNXkK3Mcy9rBbdvEs5O0Jmqaax/eOdU0Yot
+++B3lX+3ddOseT2ZEFjzObqTtkWuFBeBxuYNcRTsu3qMdIBsEb8URQdsTtjoIja2fK
+++hreVgjK36GW70KXEl8V/vq5qjQulmqkBEjmilcDuiREKqQuyeagUOnhQaBplqVco
+++4xznh5DMBMRbpGb5lHxKv4cPNi+uNAJ5i98zWUM1JRt6aXnRCuWcll1z8fRZ+5kD
+++vK9FaZU3VRMK/eknEG49cGr8OuJ6ZRSaC+tKwV1y+amkSZpKPWnk2bUnQI3ApJv3
+++k1e1EToeECpMUkLMDgNbpKBoz4nqMEvAAlYgw9xKNbLlQlahqTVEAmaJHh4yDMDy
+++i7IZ9Wrn47IGoR7s3cvhDHUpRPeW4nsmgzj+tf5EAxemI61STZJTTWo0iaPGJxct
+++9nhOOhw1I38Mvm4vkAbFH7YJ0B6QrjjYL2MbOTp5JiIh4vdOeWwNo9/y4ffyaN5+
+++ADpxuuIAmcbdr6GPOhkOFFixRJa0B2eP1i032HESlLs8RB9oYtdTXdXQotnIgJGd
+++Y8tSKOa1zjzeLHn3AVpRZTUW++/BxmApV3GKIeG8fsUjg/df0QRrBcdC/1uccdaG
+++KKlAOwlywVn5jUlwHkTmDiTM9w5AqVVGHZ2b+4ZgQW8jnPKN0SrKf6U555D+zp7E
+++x4uXoE8ojN9y8m8UKf0cTLnujH2XgZorjPfuMOt5VZEhQFMS2QaljSeni5CJJ8gk
+++XtztNqfBlAtWR4V5iAHeQOfIB2YaOy8GESda89tyKraKeaez41VblpTVHTeq9IIF
+++YB4cQA2PfuNaGVRGLMAgT3Dvl+mxxxeJyxnGAiUcETU/jJJt9QombiuszBlYGQ5d
+++ELOSm/eQSRARV9zNSt5jaQlMSjMBqenIEM09BzYqa7jDwqoztFxNdO8bcuQPuKwa
+++4z3bBZ1yYm63WFdNbQqqGEwc0OYmqg1raJ0zltgHyjFyw8IGu4g/wETs+nVQcH7D
+++vKuje86bePD6kD/LH3wmkA==
+++-----END DSA PARAMETERS-----
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0096-Fix-typo-in-CONTRIBUTING.md.patch b/package/libs/openssl/patches/0096-Fix-typo-in-CONTRIBUTING.md.patch
+new file mode 100644
+index 0000000..bd135f7
+--- /dev/null
++++ b/package/libs/openssl/patches/0096-Fix-typo-in-CONTRIBUTING.md.patch
+@@ -0,0 +1,32 @@
++From 564ffc19834ea561ef177a86b38c132bb8aa055d Mon Sep 17 00:00:00 2001
++From: James Muir <muir.james.a@gmail.com>
++Date: Wed, 15 May 2024 22:07:58 -0400
++Subject: [PATCH 096/104] Fix typo in CONTRIBUTING.md
++
++CLA: trivial
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tim Hudson <tjh@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24413)
++
++(cherry picked from commit 45f5d51b72a262bf85c4461fbded91485ce6b9da)
++---
++ CONTRIBUTING.md | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
++index 0066e7e8ad..fec6616e21 100644
++--- a/CONTRIBUTING.md
+++++ b/CONTRIBUTING.md
++@@ -9,7 +9,7 @@ Development is done on GitHub in the [openssl/openssl] repository.
++ 
++   [openssl/openssl]: <https://github.com/openssl/openssl>
++ 
++-To request new a feature, ask a question, or report a bug,
+++To request a new feature, ask a question, or report a bug,
++ please open an [issue on GitHub](https://github.com/openssl/openssl/issues).
++ 
++ To submit a patch or implement a new feature, please open a
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0097-fips-provider-explicitly-setup-cpuid-when-initializi.patch b/package/libs/openssl/patches/0097-fips-provider-explicitly-setup-cpuid-when-initializi.patch
+new file mode 100644
+index 0000000..2020a72
+--- /dev/null
++++ b/package/libs/openssl/patches/0097-fips-provider-explicitly-setup-cpuid-when-initializi.patch
+@@ -0,0 +1,50 @@
++From 4654e94a40220f49d0be2f18094bec465ce639df Mon Sep 17 00:00:00 2001
++From: Hongren Zheng <i@zenithal.me>
++Date: Thu, 16 May 2024 16:41:25 +0800
++Subject: [PATCH 097/104] fips provider: explicitly setup cpuid when
++ initializing
++
++Fixes: #23979
++
++Previously fips module relied on OPENSSL_cpuid_setup
++being used as constructor by the linker to correctly
++setup the capability vector, either via .section .init
++(for x86_64) or via __attribute__((constructor)).
++
++This would make ld.so call OPENSSL_cpuid_setup before
++the init function for fips module. However, this early
++constructing behavior has several disadvantages:
++
++1. Not all platform/toolchain supports such behavior
++
++2. Initialisation sequence is not well defined, and
++some function might not be initialized when cpuid_setup
++is called
++
++3. Implicit path is hard to maintain and debug
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24419)
++
++(cherry picked from commit a192b2439c0207ce1b04ba6137329b68f9e23680)
++---
++ providers/fips/fipsprov.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/providers/fips/fipsprov.c b/providers/fips/fipsprov.c
++index 6a88039423..c59f7fae31 100644
++--- a/providers/fips/fipsprov.c
+++++ b/providers/fips/fipsprov.c
++@@ -655,6 +655,8 @@ int OSSL_provider_init_int(const OSSL_CORE_HANDLE *handle,
++         }
++     }
++ 
+++    OPENSSL_cpuid_setup();
+++
++     /*  Create a context. */
++     if ((*provctx = ossl_prov_ctx_new()) == NULL
++         || (libctx = OSSL_LIB_CTX_new()) == NULL) {
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0098-Docs-Default-value-for-verification-flags-is-SSL_VER.patch b/package/libs/openssl/patches/0098-Docs-Default-value-for-verification-flags-is-SSL_VER.patch
+new file mode 100644
+index 0000000..946cd3a
+--- /dev/null
++++ b/package/libs/openssl/patches/0098-Docs-Default-value-for-verification-flags-is-SSL_VER.patch
+@@ -0,0 +1,32 @@
++From ec559c2a6cca3fd4cedae5c47f2dfa38e5e24865 Mon Sep 17 00:00:00 2001
++From: Ruslan Baratov <x@ruslo.dev>
++Date: Sat, 18 May 2024 23:34:19 +0800
++Subject: [PATCH 098/104] [Docs] Default value for verification flags is
++ 'SSL_VERIFY_NONE'
++
++Reviewed-by: Paul Dale <ppzgs1@gmail.com>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24435)
++
++(cherry picked from commit a73e07dbb7df4795c4ec537f19516b541fb8dd3c)
++---
++ doc/man3/SSL_CTX_set_verify.pod | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/doc/man3/SSL_CTX_set_verify.pod b/doc/man3/SSL_CTX_set_verify.pod
++index 9d4abac30e..fcbf276798 100644
++--- a/doc/man3/SSL_CTX_set_verify.pod
+++++ b/doc/man3/SSL_CTX_set_verify.pod
++@@ -144,6 +144,9 @@ B<Client mode:> ignored (see BUGS)
++ 
++ If the B<mode> is SSL_VERIFY_NONE none of the other flags may be set.
++ 
+++If verification flags are not modified explicitly by C<SSL_CTX_set_verify()>
+++or C<SSL_set_verify()>, the default value will be SSL_VERIFY_NONE.
+++
++ The actual verification procedure is performed either using the built-in
++ verification procedure or using another application provided verification
++ function set with
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0099-Only-free-the-read-buffers-if-we-re-not-using-them.patch b/package/libs/openssl/patches/0099-Only-free-the-read-buffers-if-we-re-not-using-them.patch
+new file mode 100644
+index 0000000..49bfe0d
+--- /dev/null
++++ b/package/libs/openssl/patches/0099-Only-free-the-read-buffers-if-we-re-not-using-them.patch
+@@ -0,0 +1,72 @@
++From b3f0eb0a295f58f16ba43ba99dad70d4ee5c437d Mon Sep 17 00:00:00 2001
++From: Watson Ladd <watsonbladd@gmail.com>
++Date: Wed, 24 Apr 2024 11:26:56 +0100
++Subject: [PATCH 099/104] Only free the read buffers if we're not using them
++
++If we're part way through processing a record, or the application has
++not released all the records then we should not free our buffer because
++they are still needed.
++
++CVE-2024-4741
++
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Matt Caswell <matt@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24395)
++
++(cherry picked from commit 704f725b96aa373ee45ecfb23f6abfe8be8d9177)
++---
++ ssl/record/rec_layer_s3.c | 9 +++++++++
++ ssl/record/record.h       | 1 +
++ ssl/ssl_lib.c             | 3 +++
++ 3 files changed, 13 insertions(+)
++
++diff --git a/ssl/record/rec_layer_s3.c b/ssl/record/rec_layer_s3.c
++index 4bcffcc41e..1569997bea 100644
++--- a/ssl/record/rec_layer_s3.c
+++++ b/ssl/record/rec_layer_s3.c
++@@ -81,6 +81,15 @@ int RECORD_LAYER_read_pending(const RECORD_LAYER *rl)
++     return SSL3_BUFFER_get_left(&rl->rbuf) != 0;
++ }
++ 
+++int RECORD_LAYER_data_present(const RECORD_LAYER *rl)
+++{
+++    if (rl->rstate == SSL_ST_READ_BODY)
+++        return 1;
+++    if (RECORD_LAYER_processed_read_pending(rl))
+++        return 1;
+++    return 0;
+++}
+++
++ /* Checks if we have decrypted unread record data pending */
++ int RECORD_LAYER_processed_read_pending(const RECORD_LAYER *rl)
++ {
++diff --git a/ssl/record/record.h b/ssl/record/record.h
++index 234656bf93..b60f71c8cb 100644
++--- a/ssl/record/record.h
+++++ b/ssl/record/record.h
++@@ -205,6 +205,7 @@ void RECORD_LAYER_release(RECORD_LAYER *rl);
++ int RECORD_LAYER_read_pending(const RECORD_LAYER *rl);
++ int RECORD_LAYER_processed_read_pending(const RECORD_LAYER *rl);
++ int RECORD_LAYER_write_pending(const RECORD_LAYER *rl);
+++int RECORD_LAYER_data_present(const RECORD_LAYER *rl);
++ void RECORD_LAYER_reset_read_sequence(RECORD_LAYER *rl);
++ void RECORD_LAYER_reset_write_sequence(RECORD_LAYER *rl);
++ int RECORD_LAYER_is_sslv2_record(RECORD_LAYER *rl);
++diff --git a/ssl/ssl_lib.c b/ssl/ssl_lib.c
++index eed649c6fd..d14c55ae55 100644
++--- a/ssl/ssl_lib.c
+++++ b/ssl/ssl_lib.c
++@@ -5492,6 +5492,9 @@ int SSL_free_buffers(SSL *ssl)
++     if (RECORD_LAYER_read_pending(rl) || RECORD_LAYER_write_pending(rl))
++         return 0;
++ 
+++    if (RECORD_LAYER_data_present(rl))
+++        return 0;
+++
++     RECORD_LAYER_release(rl);
++     return 1;
++ }
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0100-Set-rlayer.packet-to-NULL-after-we-ve-finished-using.patch b/package/libs/openssl/patches/0100-Set-rlayer.packet-to-NULL-after-we-ve-finished-using.patch
+new file mode 100644
+index 0000000..5b8cacd
+--- /dev/null
++++ b/package/libs/openssl/patches/0100-Set-rlayer.packet-to-NULL-after-we-ve-finished-using.patch
+@@ -0,0 +1,53 @@
++From 2d05959073c4bf8803401668b9df85931a08e020 Mon Sep 17 00:00:00 2001
++From: Matt Caswell <matt@openssl.org>
++Date: Wed, 24 Apr 2024 11:33:41 +0100
++Subject: [PATCH 100/104] Set rlayer.packet to NULL after we've finished using
++ it
++
++In order to ensure we do not have a UAF we reset the rlayer.packet pointer
++to NULL after we free it.
++
++CVE-2024-4741
++
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24395)
++
++(cherry picked from commit d146349171101dec3a876c13eb7a6dea32ba62ba)
++---
++ ssl/record/rec_layer_s3.c | 6 ++++++
++ ssl/record/ssl3_buffer.c  | 2 ++
++ 2 files changed, 8 insertions(+)
++
++diff --git a/ssl/record/rec_layer_s3.c b/ssl/record/rec_layer_s3.c
++index 1569997bea..779e998bb6 100644
++--- a/ssl/record/rec_layer_s3.c
+++++ b/ssl/record/rec_layer_s3.c
++@@ -230,6 +230,12 @@ int ssl3_read_n(SSL *s, size_t n, size_t max, int extend, int clearold,
++         /* ... now we can act as if 'extend' was set */
++     }
++ 
+++    if (!ossl_assert(s->rlayer.packet != NULL)) {
+++        /* does not happen */
+++        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+++        return -1;
+++    }
+++
++     len = s->rlayer.packet_length;
++     pkt = rb->buf + align;
++     /*
++diff --git a/ssl/record/ssl3_buffer.c b/ssl/record/ssl3_buffer.c
++index 97b0c26ced..1a10a7c0b8 100644
++--- a/ssl/record/ssl3_buffer.c
+++++ b/ssl/record/ssl3_buffer.c
++@@ -191,5 +191,7 @@ int ssl3_release_read_buffer(SSL *s)
++         OPENSSL_cleanse(b->buf, b->len);
++     OPENSSL_free(b->buf);
++     b->buf = NULL;
+++    s->rlayer.packet = NULL;
+++    s->rlayer.packet_length = 0;
++     return 1;
++ }
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0101-Extend-the-SSL_free_buffers-testing.patch b/package/libs/openssl/patches/0101-Extend-the-SSL_free_buffers-testing.patch
+new file mode 100644
+index 0000000..27fa0ae
+--- /dev/null
++++ b/package/libs/openssl/patches/0101-Extend-the-SSL_free_buffers-testing.patch
+@@ -0,0 +1,133 @@
++From 6fef334f914abfcd988e53a32d19f01d84529f74 Mon Sep 17 00:00:00 2001
++From: Matt Caswell <matt@openssl.org>
++Date: Thu, 25 Apr 2024 09:34:16 +0100
++Subject: [PATCH 101/104] Extend the SSL_free_buffers testing
++
++Test that attempting to free the buffers at points where they should not
++be freed works as expected.
++
++Follow on from CVE-2024-4741
++
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24395)
++
++(cherry picked from commit 4238abc17d44383592f92d6254d89dac806ee76b)
++---
++ test/sslbuffertest.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
++ 1 file changed, 93 insertions(+)
++
++diff --git a/test/sslbuffertest.c b/test/sslbuffertest.c
++index 3c3e69d61d..133fdb13ee 100644
++--- a/test/sslbuffertest.c
+++++ b/test/sslbuffertest.c
++@@ -150,6 +150,98 @@ static int test_func(int test)
++     return result;
++ }
++ 
+++/*
+++ * Test that attempting to free the buffers at points where they cannot be freed
+++ * works as expected
+++ * Test 0: Attempt to free buffers after a full record has been processed, but
+++ *         the application has only performed a partial read
+++ * Test 1: Attempt to free buffers after only a partial record header has been
+++ *         received
+++ * Test 2: Attempt to free buffers after a full record header but no record body
+++ * Test 3: Attempt to free buffers after a full record hedaer and partial record
+++ *         body
+++ */
+++static int test_free_buffers(int test)
+++{
+++    int result = 0;
+++    SSL *serverssl = NULL, *clientssl = NULL;
+++    const char testdata[] = "Test data";
+++    char buf[40];
+++    size_t written, readbytes;
+++
+++    if (!TEST_true(create_ssl_objects(serverctx, clientctx, &serverssl,
+++                                      &clientssl, NULL, NULL)))
+++        goto end;
+++
+++    if (!TEST_true(create_ssl_connection(serverssl, clientssl,
+++                                         SSL_ERROR_NONE)))
+++        goto end;
+++
+++
+++    if (!TEST_true(SSL_write_ex(clientssl, testdata, sizeof(testdata),
+++                                &written)))
+++        goto end;
+++
+++    if (test == 0) {
+++        /*
+++        * Deliberately only read the first byte - so the remaining bytes are
+++        * still buffered
+++        */
+++        if (!TEST_true(SSL_read_ex(serverssl, buf, 1, &readbytes)))
+++            goto end;
+++    } else {
+++        BIO *tmp;
+++        size_t partial_len;
+++
+++        /* Remove all the data that is pending for read by the server */
+++        tmp = SSL_get_rbio(serverssl);
+++        if (!TEST_true(BIO_read_ex(tmp, buf, sizeof(buf), &readbytes))
+++                || !TEST_size_t_lt(readbytes, sizeof(buf))
+++                || !TEST_size_t_gt(readbytes, SSL3_RT_HEADER_LENGTH))
+++            goto end;
+++
+++        switch(test) {
+++        case 1:
+++            partial_len = SSL3_RT_HEADER_LENGTH - 1;
+++            break;
+++        case 2:
+++            partial_len = SSL3_RT_HEADER_LENGTH;
+++            break;
+++        case 3:
+++            partial_len = readbytes - 1;
+++            break;
+++        default:
+++            TEST_error("Invalid test index");
+++            goto end;
+++        }
+++
+++        /* Put back just the partial record */
+++        if (!TEST_true(BIO_write_ex(tmp, buf, partial_len, &written)))
+++            goto end;
+++
+++        /*
+++         * Attempt a read. This should fail because only a partial record is
+++         * available.
+++         */
+++        if (!TEST_false(SSL_read_ex(serverssl, buf, 1, &readbytes)))
+++            goto end;
+++    }
+++
+++    /*
+++     * Attempting to free the buffers at this point should fail because they are
+++     * still in use
+++     */
+++    if (!TEST_false(SSL_free_buffers(serverssl)))
+++        goto end;
+++
+++    result = 1;
+++ end:
+++    SSL_free(clientssl);
+++    SSL_free(serverssl);
+++
+++    return result;
+++}
+++
++ OPT_TEST_DECLARE_USAGE("certfile privkeyfile\n")
++ 
++ int setup_tests(void)
++@@ -173,6 +265,7 @@ int setup_tests(void)
++     }
++ 
++     ADD_ALL_TESTS(test_func, 9);
+++    ADD_ALL_TESTS(test_free_buffers, 4);
++     return 1;
++ }
++ 
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0102-Move-the-ability-to-load-the-dasync-engine-into-sslt.patch b/package/libs/openssl/patches/0102-Move-the-ability-to-load-the-dasync-engine-into-sslt.patch
+new file mode 100644
+index 0000000..be15804
+--- /dev/null
++++ b/package/libs/openssl/patches/0102-Move-the-ability-to-load-the-dasync-engine-into-sslt.patch
+@@ -0,0 +1,119 @@
++From 1359c00e683840154760b7ba9204bad1b13dc074 Mon Sep 17 00:00:00 2001
++From: Matt Caswell <matt@openssl.org>
++Date: Fri, 26 Apr 2024 11:05:52 +0100
++Subject: [PATCH 102/104] Move the ability to load the dasync engine into
++ ssltestlib.c
++
++The sslapitest has a helper function to load the dasync engine which is
++useful for testing pipelining. We would like to have the same facility
++from sslbuffertest, so we move the function to the common location
++ssltestlib.c
++
++Follow on from CVE-2024-4741
++
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24395)
++
++(cherry picked from commit 0544c21a22f4d787e6f31d35e8f980402ac90a6d)
++---
++ test/helpers/ssltestlib.c | 33 +++++++++++++++++++++++++++++++++
++ test/helpers/ssltestlib.h |  1 +
++ test/sslapitest.c         | 21 ---------------------
++ 3 files changed, 34 insertions(+), 21 deletions(-)
++
++diff --git a/test/helpers/ssltestlib.c b/test/helpers/ssltestlib.c
++index ef4a6177aa..da14f6697d 100644
++--- a/test/helpers/ssltestlib.c
+++++ b/test/helpers/ssltestlib.c
++@@ -7,8 +7,17 @@
++  * https://www.openssl.org/source/license.html
++  */
++ 
+++/*
+++ * We need access to the deprecated low level ENGINE APIs for legacy purposes
+++ * when the deprecated calls are not hidden
+++ */
+++#ifndef OPENSSL_NO_DEPRECATED_3_0
+++# define OPENSSL_SUPPRESS_DEPRECATED
+++#endif
+++
++ #include <string.h>
++ 
+++#include <openssl/engine.h>
++ #include "internal/nelem.h"
++ #include "ssltestlib.h"
++ #include "../testutil.h"
++@@ -1182,3 +1191,27 @@ void shutdown_ssl_connection(SSL *serverssl, SSL *clientssl)
++     SSL_free(serverssl);
++     SSL_free(clientssl);
++ }
+++
+++ENGINE *load_dasync(void)
+++{
+++#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_DYNAMIC_ENGINE)
+++    ENGINE *e;
+++
+++    if (!TEST_ptr(e = ENGINE_by_id("dasync")))
+++        return NULL;
+++
+++    if (!TEST_true(ENGINE_init(e))) {
+++        ENGINE_free(e);
+++        return NULL;
+++    }
+++
+++    if (!TEST_true(ENGINE_register_ciphers(e))) {
+++        ENGINE_free(e);
+++        return NULL;
+++    }
+++
+++    return e;
+++#else
+++    return NULL;
+++#endif
+++}
++diff --git a/test/helpers/ssltestlib.h b/test/helpers/ssltestlib.h
++index 8e9daa5601..2777fb3047 100644
++--- a/test/helpers/ssltestlib.h
+++++ b/test/helpers/ssltestlib.h
++@@ -59,4 +59,5 @@ typedef struct mempacket_st MEMPACKET;
++ 
++ DEFINE_STACK_OF(MEMPACKET)
++ 
+++ENGINE *load_dasync(void);
++ #endif /* OSSL_TEST_SSLTESTLIB_H */
++diff --git a/test/sslapitest.c b/test/sslapitest.c
++index 28bc94d672..c2ff727513 100644
++--- a/test/sslapitest.c
+++++ b/test/sslapitest.c
++@@ -10299,27 +10299,6 @@ end:
++ }
++ 
++ #if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_DYNAMIC_ENGINE)
++-
++-static ENGINE *load_dasync(void)
++-{
++-    ENGINE *e;
++-
++-    if (!TEST_ptr(e = ENGINE_by_id("dasync")))
++-        return NULL;
++-
++-    if (!TEST_true(ENGINE_init(e))) {
++-        ENGINE_free(e);
++-        return NULL;
++-    }
++-
++-    if (!TEST_true(ENGINE_register_ciphers(e))) {
++-        ENGINE_free(e);
++-        return NULL;
++-    }
++-
++-    return e;
++-}
++-
++ /*
++  * Test TLSv1.2 with a pipeline capable cipher. TLSv1.3 and DTLS do not
++  * support this yet. The only pipeline capable cipher that we have is in the
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0103-Further-extend-the-SSL_free_buffers-testing.patch b/package/libs/openssl/patches/0103-Further-extend-the-SSL_free_buffers-testing.patch
+new file mode 100644
+index 0000000..0158e4a
+--- /dev/null
++++ b/package/libs/openssl/patches/0103-Further-extend-the-SSL_free_buffers-testing.patch
+@@ -0,0 +1,201 @@
++From d095674320c84b8ed1250715b1dd5ce05f9f267b Mon Sep 17 00:00:00 2001
++From: Matt Caswell <matt@openssl.org>
++Date: Fri, 26 Apr 2024 13:58:29 +0100
++Subject: [PATCH 103/104] Further extend the SSL_free_buffers testing
++
++We extend the testing to test what happens when pipelining is in use.
++
++Follow on from CVE-2024-4741
++
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24395)
++
++(cherry picked from commit 6972d5ace1275faf404e7a53e806861962f4121c)
++---
++ test/sslbuffertest.c | 113 +++++++++++++++++++++++++++++++++++++------
++ 1 file changed, 97 insertions(+), 16 deletions(-)
++
++diff --git a/test/sslbuffertest.c b/test/sslbuffertest.c
++index 133fdb13ee..7079d04e15 100644
++--- a/test/sslbuffertest.c
+++++ b/test/sslbuffertest.c
++@@ -8,10 +8,19 @@
++  * or in the file LICENSE in the source distribution.
++  */
++ 
+++/*
+++ * We need access to the deprecated low level Engine APIs for legacy purposes
+++ * when the deprecated calls are not hidden
+++ */
+++#ifndef OPENSSL_NO_DEPRECATED_3_0
+++# define OPENSSL_SUPPRESS_DEPRECATED
+++#endif
+++
++ #include <string.h>
++ #include <openssl/ssl.h>
++ #include <openssl/bio.h>
++ #include <openssl/err.h>
+++#include <openssl/engine.h>
++ 
++ #include "internal/packet.h"
++ 
++@@ -160,34 +169,65 @@ static int test_func(int test)
++  * Test 2: Attempt to free buffers after a full record header but no record body
++  * Test 3: Attempt to free buffers after a full record hedaer and partial record
++  *         body
+++ * Test 4-7: We repeat tests 0-3 but including data from a second pipelined
+++ *           record
++  */
++ static int test_free_buffers(int test)
++ {
++     int result = 0;
++     SSL *serverssl = NULL, *clientssl = NULL;
++     const char testdata[] = "Test data";
++-    char buf[40];
+++    char buf[120];
++     size_t written, readbytes;
+++    int i, pipeline = test > 3;
+++    ENGINE *e = NULL;
+++
+++    if (pipeline) {
+++        e = load_dasync();
+++        if (e == NULL)
+++            goto end;
+++        test -= 4;
+++    }
++ 
++     if (!TEST_true(create_ssl_objects(serverctx, clientctx, &serverssl,
++                                       &clientssl, NULL, NULL)))
++         goto end;
++ 
+++    if (pipeline) {
+++        if (!TEST_true(SSL_set_cipher_list(serverssl, "AES128-SHA"))
+++                || !TEST_true(SSL_set_max_proto_version(serverssl,
+++                                                        TLS1_2_VERSION))
+++                || !TEST_true(SSL_set_max_pipelines(serverssl, 2)))
+++            goto end;
+++    }
+++
++     if (!TEST_true(create_ssl_connection(serverssl, clientssl,
++                                          SSL_ERROR_NONE)))
++         goto end;
++ 
++-
++-    if (!TEST_true(SSL_write_ex(clientssl, testdata, sizeof(testdata),
++-                                &written)))
++-        goto end;
+++    /*
+++     * For the non-pipeline case we write one record. For pipelining we write
+++     * two records.
+++     */
+++    for (i = 0; i <= pipeline; i++) {
+++        if (!TEST_true(SSL_write_ex(clientssl, testdata, strlen(testdata),
+++                                    &written)))
+++            goto end;
+++    }
++ 
++     if (test == 0) {
+++        size_t readlen = 1;
+++
++         /*
++-        * Deliberately only read the first byte - so the remaining bytes are
++-        * still buffered
++-        */
++-        if (!TEST_true(SSL_read_ex(serverssl, buf, 1, &readbytes)))
+++         * Deliberately only read the first byte - so the remaining bytes are
+++         * still buffered. In the pipelining case we read as far as the first
+++         * byte from the second record.
+++         */
+++        if (pipeline)
+++            readlen += strlen(testdata);
+++
+++        if (!TEST_true(SSL_read_ex(serverssl, buf, readlen, &readbytes))
+++                || !TEST_size_t_eq(readlen, readbytes))
++             goto end;
++     } else {
++         BIO *tmp;
++@@ -215,16 +255,47 @@ static int test_free_buffers(int test)
++             goto end;
++         }
++ 
++-        /* Put back just the partial record */
++-        if (!TEST_true(BIO_write_ex(tmp, buf, partial_len, &written)))
++-            goto end;
+++        if (pipeline) {
+++            /* We happen to know the first record is 57 bytes long */
+++            const size_t first_rec_len = 57;
+++
+++            if (test != 3)
+++                partial_len += first_rec_len;
+++
+++            /*
+++             * Sanity check. If we got the record len right then this should
+++             * never fail.
+++             */
+++            if (!TEST_int_eq(buf[first_rec_len], SSL3_RT_APPLICATION_DATA))
+++                goto end;
+++        }
++ 
++         /*
++-         * Attempt a read. This should fail because only a partial record is
++-         * available.
+++         * Put back just the partial record (plus the whole initial record in
+++         * the pipelining case)
++          */
++-        if (!TEST_false(SSL_read_ex(serverssl, buf, 1, &readbytes)))
+++        if (!TEST_true(BIO_write_ex(tmp, buf, partial_len, &written)))
++             goto end;
+++
+++        if (pipeline) {
+++            /*
+++             * Attempt a read. This should pass but only return data from the
+++             * first record. Only a partial record is available for the second
+++             * record.
+++             */
+++            if (!TEST_true(SSL_read_ex(serverssl, buf, sizeof(buf),
+++                                        &readbytes))
+++                    || !TEST_size_t_eq(readbytes, strlen(testdata)))
+++                goto end;
+++        } else {
+++            /*
+++            * Attempt a read. This should fail because only a partial record is
+++            * available.
+++            */
+++            if (!TEST_false(SSL_read_ex(serverssl, buf, sizeof(buf),
+++                                        &readbytes)))
+++                goto end;
+++        }
++     }
++ 
++     /*
++@@ -238,7 +309,13 @@ static int test_free_buffers(int test)
++  end:
++     SSL_free(clientssl);
++     SSL_free(serverssl);
++-
+++#ifndef OPENSSL_NO_DYNAMIC_ENGINE
+++    if (e != NULL) {
+++        ENGINE_unregister_ciphers(e);
+++        ENGINE_finish(e);
+++        ENGINE_free(e);
+++    }
+++#endif
++     return result;
++ }
++ 
++@@ -265,7 +342,11 @@ int setup_tests(void)
++     }
++ 
++     ADD_ALL_TESTS(test_func, 9);
+++#if !defined(OPENSSL_NO_TLS1_2) && !defined(OPENSSL_NO_DYNAMIC_ENGINE)
+++    ADD_ALL_TESTS(test_free_buffers, 8);
+++#else
++     ADD_ALL_TESTS(test_free_buffers, 4);
+++#endif
++     return 1;
++ }
++ 
++-- 
++2.38.1.windows.1
++
+diff --git a/package/libs/openssl/patches/0104-ecstresstest.c-Fix-memory-leak-on-error.patch b/package/libs/openssl/patches/0104-ecstresstest.c-Fix-memory-leak-on-error.patch
+new file mode 100644
+index 0000000..f9534e2
+--- /dev/null
++++ b/package/libs/openssl/patches/0104-ecstresstest.c-Fix-memory-leak-on-error.patch
+@@ -0,0 +1,33 @@
++From d74704317dfe3a27a2175095ad1118152bc8ffa5 Mon Sep 17 00:00:00 2001
++From: Nek Saikou <NekSaikou@proton.me>
++Date: Fri, 24 May 2024 17:45:01 +0700
++Subject: [PATCH 104/104] ecstresstest.c: Fix memory leak on error
++
++Fixes #24476
++CLA: trivial
++
++Reviewed-by: Neil Horman <nhorman@openssl.org>
++Reviewed-by: Tomas Mraz <tomas@openssl.org>
++(Merged from https://github.com/openssl/openssl/pull/24488)
++
++(cherry picked from commit 434e7f7cb4259f8c8c1463fd38fe723b3efca887)
++---
++ test/ecstresstest.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/test/ecstresstest.c b/test/ecstresstest.c
++index 22d46c50da..b4dd463740 100644
++--- a/test/ecstresstest.c
+++++ b/test/ecstresstest.c
++@@ -79,7 +79,7 @@ static int test_curve(void)
++             || !TEST_ptr(point = EC_POINT_dup(EC_GROUP_get0_generator(group),
++                                               group))
++             || !TEST_ptr(result = walk_curve(group, point, num_repeats)))
++-        return 0;
+++        goto err;
++ 
++     if (print_mode) {
++         BN_print(bio_out, result);
++-- 
++2.38.1.windows.1
++
+-- 
+2.38.1.windows.1
+
