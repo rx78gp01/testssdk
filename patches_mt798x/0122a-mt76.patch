@@ -1,0 +1,26 @@
+diff --git a/package/kernel/mt76/Makefile b/package/kernel/mt76/Makefile
+index 548492e9194c3..f2339e942a324 100644
+--- a/package/kernel/mt76/Makefile
++++ b/package/kernel/mt76/Makefile
+@@ -1,7 +1,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=mt76
+-PKG_RELEASE=3
++PKG_RELEASE=1
+ 
+ PKG_LICENSE:=GPLv2
+ PKG_LICENSE_FILES:=
+@@ -8,9 +8,9 @@ PKG_LICENSE_FILES:=
+ 
+ PKG_SOURCE_URL:=https://github.com/openwrt/mt76
+ PKG_SOURCE_PROTO:=git
+-PKG_SOURCE_DATE:=2024-03-18
+-PKG_SOURCE_VERSION:=2135e201e7a9339e018d4e2d4a33c73266e674d7
+-PKG_MIRROR_HASH:=810f636c60c86e6a426c676c3bf7aaea2f711feb31f4a66889d485112b612745
++PKG_SOURCE_DATE:=2024-05-17
++PKG_SOURCE_VERSION:=513c131c6309712a51502870b041f45b4bd6a6d4
++PKG_MIRROR_HASH:=skip
+ 
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
+ PKG_USE_NINJA:=0
