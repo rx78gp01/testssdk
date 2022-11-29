@@ -1,0 +1,17 @@
+From 2bd61c742834cb7f85f3d662b0637fa841073b06 Mon Sep 17 00:00:00 2001
+From: Sean Khan <datapronix@protonmail.com>
+Date: Sat, 8 Jun 2024 21:02:30 -0400
+Subject: [PATCH] openssl: conditionally disable engine section
+diff --git a/package/libs/openssl/Makefile b/package/libs/openssl/Makefile
+index b134839bb6ef5..82784ddddee61 100644
+--- a/package/libs/openssl/Makefile
++++ b/package/libs/openssl/Makefile
+@@ -416,6 +416,8 @@ define Package/libopenssl-conf/install
+ 	$(INSTALL_BIN) ./files/openssl.init $(1)/etc/init.d/openssl
+ 	$(SED) 's!%ENGINES_DIR%!/usr/lib/$(ENGINES_DIR)!' $(1)/etc/init.d/openssl
+ 	touch $(1)/etc/config/openssl
++	$(if $(CONFIG_OPENSSL_ENGINE),,
++		$(SED) 's!engines = engines_sect!#&!' $(1)/etc/ssl/openssl.cnf)
+ 	$(if $(CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO),
+ 		$(CP) ./files/devcrypto.cnf $(1)/etc/ssl/modules.cnf.d/
+ 		echo -e "config engine 'devcrypto'\n\toption enabled '1'\n\toption builtin '1'" >> $(1)/etc/config/openssl)
