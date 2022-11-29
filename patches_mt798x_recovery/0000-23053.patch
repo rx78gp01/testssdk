@@ -1,0 +1,86 @@
+From 01170d518da1c8ade9d26e56d0135d12cda8e781 Mon Sep 17 00:00:00 2001
+From: Hauke Mehrtens <hauke@hauke-m.de>
+Date: Fri, 22 Mar 2024 23:26:03 +0100
+Subject: [PATCH] OpenWrt v23.05.3: adjust config defaults
+
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ feeds.conf.default                 | 8 ++++----
+ include/version.mk                 | 6 +++---
+ package/base-files/image-config.in | 4 ++--
+ version                            | 1 +
+ version.date                       | 1 +
+ 5 files changed, 11 insertions(+), 9 deletions(-)
+ create mode 100644 version
+ create mode 100644 version.date
+
+diff --git a/feeds.conf.default b/feeds.conf.default
+index d467db5627f54..45ab752893b81 100644
+--- a/feeds.conf.default
++++ b/feeds.conf.default
+@@ -1,4 +1,4 @@
+-src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05
+-src-git luci https://git.openwrt.org/project/luci.git;openwrt-23.05
+-src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05
+-src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05
++src-git packages https://git.openwrt.org/feed/packages.git^063b2393cbc3e5aab9d2b40b2911cab1c3967c59
++src-git luci https://git.openwrt.org/project/luci.git^b07cf9dcfc37e021e5619a41c847e63afbd5d34a
++src-git routing https://git.openwrt.org/feed/routing.git^648753932d5a7deff7f2bdb33c000018a709ad84
++src-git telephony https://git.openwrt.org/feed/telephony.git^86af194d03592121f5321474ec9918dd109d3057
+diff --git a/include/version.mk b/include/version.mk
+index 924bf8354121a..58c51b4b79f9d 100644
+--- a/include/version.mk
++++ b/include/version.mk
+@@ -23,13 +23,13 @@ PKG_CONFIG_DEPENDS += \
+ sanitize = $(call tolower,$(subst _,-,$(subst $(space),-,$(1))))
+ 
+ VERSION_NUMBER:=$(call qstrip,$(CONFIG_VERSION_NUMBER))
+-VERSION_NUMBER:=$(if $(VERSION_NUMBER),$(VERSION_NUMBER),23.05-SNAPSHOT)
++VERSION_NUMBER:=$(if $(VERSION_NUMBER),$(VERSION_NUMBER),23.05.3)
+ 
+ VERSION_CODE:=$(call qstrip,$(CONFIG_VERSION_CODE))
+-VERSION_CODE:=$(if $(VERSION_CODE),$(VERSION_CODE),$(REVISION))
++VERSION_CODE:=$(if $(VERSION_CODE),$(VERSION_CODE),r23809-234f1a2efa)
+ 
+ VERSION_REPO:=$(call qstrip,$(CONFIG_VERSION_REPO))
+-VERSION_REPO:=$(if $(VERSION_REPO),$(VERSION_REPO),https://downloads.openwrt.org/releases/23.05-SNAPSHOT)
++VERSION_REPO:=$(if $(VERSION_REPO),$(VERSION_REPO),https://downloads.openwrt.org/releases/23.05.3)
+ 
+ VERSION_DIST:=$(call qstrip,$(CONFIG_VERSION_DIST))
+ VERSION_DIST:=$(if $(VERSION_DIST),$(VERSION_DIST),OpenWrt)
+diff --git a/package/base-files/image-config.in b/package/base-files/image-config.in
+index 9a72863813375..f48dedd5fc37f 100644
+--- a/package/base-files/image-config.in
++++ b/package/base-files/image-config.in
+@@ -190,7 +190,7 @@ if VERSIONOPT
+ 	config VERSION_REPO
+ 		string
+ 		prompt "Release repository"
+-		default "https://downloads.openwrt.org/releases/23.05-SNAPSHOT"
++		default "https://downloads.openwrt.org/releases/23.05.3"
+ 		help
+ 			This is the repository address embedded in the image, it defaults
+ 			to the trunk snapshot repo; the url may contain the following placeholders:
+@@ -266,7 +266,7 @@ if VERSIONOPT
+ 	config VERSION_CODE_FILENAMES
+ 		bool
+ 		prompt "Revision code in filenames"
+-		default y
++		default n
+ 		help
+ 			Enable this to include the revision identifier or the configured
+ 			version code into the firmware image, SDK- and Image Builder archive
+diff --git a/version b/version
+new file mode 100644
+index 0000000000000..ffbfa772e97ab
+--- /dev/null
++++ b/version
+@@ -0,0 +1 @@
++r23809-234f1a2efa
+diff --git a/version.date b/version.date
+new file mode 100644
+index 0000000000000..e1e962239bea9
+--- /dev/null
++++ b/version.date
+@@ -0,0 +1 @@
++1711145382
