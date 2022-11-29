@@ -1,0 +1,24 @@
+diff --git a/package/kernel/mac80211/patches/subsys/341-mac80211-fix-legacy-rate-decode.patch b/package/kernel/mac80211/patches/subsys/341-mac80211-fix-legacy-rate-decode.patch
+new file mode 100644
+index 0000000000000..358679d56e588
+--- /dev/null
++++ b/package/kernel/mac80211/patches/subsys/341-mac80211-fix-legacy-rate-decode.patch
+@@ -0,0 +1,18 @@
++Index: backports-6.1.24/net/mac80211/sta_info.c
++===================================================================
++--- backports-6.1.24/net/mac80211/sta_info.c
+++++ backports-6.1.24/net/mac80211/sta_info.c
++@@ -2363,6 +2363,13 @@ static void sta_stats_decode_rate(struct
++ 
++ 		sband = local->hw.wiphy->bands[band];
++ 
+++		if (!sband) {
+++			wiphy_warn(local->hw.wiphy,
+++				    "Invalid band %d\n",
+++				    band);
+++			break;
+++		}
+++
++ 		if (WARN_ON_ONCE(!sband->bitrates))
++ 			break;
++ 
