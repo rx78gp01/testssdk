@@ -1,0 +1,27 @@
+From 3aec71a176b43da5c4f1901ad423bacfb258f444 Mon Sep 17 00:00:00 2001
+From: Rany Hany <rany_hany@riseup.net>
+Date: Wed, 3 Jan 2024 18:43:33 +0200
+Subject: [PATCH] mac80211: add missing newline for "min_tx_power"
+
+This prevents min_tx_power from functioning properly in some circumstances.
+Add the missing newline.
+
+Signed-off-by: Rany Hany <rany_hany@riseup.net>
+(cherry picked from commit 6ca8752a9cadac810f8541ec1be67d02265175aa)
+---
+ package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+index 1bf4db6e5f055..b5378e556eb23 100644
+--- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
++++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+@@ -145,7 +145,7 @@ mac80211_hostapd_setup_base() {
+ 	[ "$auto_channel" = 0 ] && [ -z "$channel_list" ] && \
+ 		channel_list="$channel"
+ 
+-	[ "$min_tx_power" -gt 0 ] && append base_cfg "min_tx_power=$min_tx_power"
++	[ "$min_tx_power" -gt 0 ] && append base_cfg "min_tx_power=$min_tx_power" "$N"
+ 
+ 	set_default noscan 0
+ 
