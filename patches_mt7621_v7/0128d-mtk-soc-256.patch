@@ -1,0 +1,58 @@
+diff --git a/target/linux/ramips/patches-5.15/966-mtk_eth_soc.patch b/target/linux/ramips/patches-5.15/966-mtk_eth_soc.patch
+new file mode 100644
+index 0000000..d065233
+--- /dev/null
++++ b/target/linux/ramips/patches-5.15/966-mtk_eth_soc.patch
+@@ -0,0 +1,52 @@
++diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++index d4c0ea8..0d486e1 100644
++--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++@@ -5180,7 +5180,7 @@ static const struct mtk_soc_data mt7621_data = {
++ 		.dma_max_len = MTK_TX_DMA_BUF_LEN,
++ 		.dma_len_offset = 16,
++-		.dma_size = MTK_DMA_SIZE(2K),
+++		.dma_size = MTK_DMA_SIZE(256),
++ 	},
++ };
++ 
++ static const struct mtk_soc_data mt7622_data = {
++@@ -5283,7 +5283,7 @@ static const struct mtk_soc_data mt7981_data = {
++ 		.desc_size = sizeof(struct mtk_tx_dma_v2),
++ 		.dma_max_len = MTK_TX_DMA_BUF_LEN_V2,
++ 		.dma_len_offset = 8,
++-		.dma_size = MTK_DMA_SIZE(2K),
+++		.dma_size = MTK_DMA_SIZE(2K),
++ 		.fq_dma_size = MTK_DMA_SIZE(2K),
++ 	},
++ 	.rx = {
++@@ -5292,7 +5292,7 @@ static const struct mtk_soc_data mt7981_data = {
++ 		.dma_max_len = MTK_TX_DMA_BUF_LEN,
++ 		.dma_len_offset = 16,
++-		.dma_size = MTK_DMA_SIZE(2K),
+++		.dma_size = MTK_DMA_SIZE(256),
++ 	},
++ };
++ 
++ static const struct mtk_soc_data mt7986_data = {
++@@ -5312,7 +5321,7 @@ static const struct mtk_soc_data mt7986_data = {
++ 		.desc_size = sizeof(struct mtk_tx_dma_v2),
++ 		.dma_max_len = MTK_TX_DMA_BUF_LEN_V2,
++ 		.dma_len_offset = 8,
++-		.dma_size = MTK_DMA_SIZE(2K),
+++		.dma_size = MTK_DMA_SIZE(2K),
++ 		.fq_dma_size = MTK_DMA_SIZE(2K),
++ 	},
++ 	.rx = {
++@@ -5321,7 +5321,7 @@ static const struct mtk_soc_data mt7986_data = {
++ 		.dma_max_len = MTK_TX_DMA_BUF_LEN,
++ 		.dma_len_offset = 16,
++-		.dma_size = MTK_DMA_SIZE(2K),
+++		.dma_size = MTK_DMA_SIZE(256),
++ 	},
++ };
++ 
++ static const struct mtk_soc_data mt7988_data = {
++-- 
++2.38.1.windows.1
++
