@@ -1,0 +1,170 @@
+# Build OpenWrt using GitHub Actions
+
+name: Build OpenWrt 21.02.5 ath79 sfe
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt.git
+  REPO_BRANCH: openwrt-21.02
+  REPO_BRANCH_VER: 21.02.5
+  REPO_TAG: v21.02.5
+  VERMAGIC: 8bf2c37fddb5d4bb9e3ca54818bf5e18
+  ARCH_PACKAGES: mips_24kc
+  REPO_DEPTH: 0
+  FEEDS_CONF: feeds.conf.21025
+  CONFIG_FILE: .config_ath79_sfe
+  FILES_PATH: files
+  PATCHES_PATH: patches
+  UPLOAD_RELEASE: true
+  TZ: UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+      with:
+        fetch-depth: 1
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install build-essential ccache ecj fastjar file g++ gawk \
+        gettext git java-propose-classpath libelf-dev libncurses5-dev \
+        libncursesw5-dev libssl-dev python python2.7-dev python3 unzip wget \
+        python3-distutils python3-setuptools python3-dev rsync subversion \
+        swig time xsltproc zlib1g-dev libboost-dev zip
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        [ $REPO_DEPTH -ge 1 ] && git clone --depth $REPO_DEPTH --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Cache OpenWrt
+      uses: rx78gp01/cache@main
+      env:
+        cache-name: cache-openwrt
+      with:
+        path: |
+          openwrt/staging_dir
+          openwrt/build_dir
+          openwrt/dl
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.REPO_BRANCH }}-${{ env.VERMAGIC }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.VERMAGIC }}
+    
+    - name: Check cache
+      run: |
+        [ -d openwrt/staging_dir ] && echo "Found staging_dir cache" || echo "No staging_dir cache"
+        [ -d openwrt/build_dir ] && echo "Found build_dir cache" || echo "No build_dir cache"
+        [ -d openwrt/dl ] && echo "Found dl cache" ||  echo "No dl cache"
+        ls -al openwrt
+
+    - name: Setup feeds
+      run: |
+        [ -e $FEEDS_CONF ] && cp $FEEDS_CONF openwrt/feeds.conf
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds update -i
+        ./scripts/feeds install -a
+
+    - name: Apply patches
+      run: |
+        [ -d $PATCHES_PATH ] && mv $PATCHES_PATH openwrt/$PATCHES_PATH
+        cd openwrt
+        wget https://github.com/openwrt/openwrt/commit/9cec59ca38a3600f175bd12e0620a1c7306aa813.patch
+        wget https://github.com/openwrt/openwrt/commit/3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        git apply --check 9cec59ca38a3600f175bd12e0620a1c7306aa813.patch
+        sed -i 's/842/840/g' 3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        git apply --check 3e8a713bc4f623afba5afc1f6e323251ad395690.patch
+        sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
+        git status -s
+
+    - name: Load custom files
+      run: |
+        [ -d $FILES_PATH ] && mv $FILES_PATH openwrt/files
+        cd openwrt && git status -s
+
+    - name: Load custom config
+      run: |
+        [ -f $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config && echo 'Custom config loaded!' || echo 'No custom config!'
+
+    - name: Setup ccache
+      uses: Chocobo1/setup-ccache-action@v1
+      with:
+          install_ccache: false
+          update_packager_index: false
+
+    - name: Download package
+      id: package
+      run: |
+        cd openwrt
+        make defconfig  V=s 2>&1 | tee defconfig.log
+        make download -j8  V=s 2>&1 | tee download.log
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+    
+    - name: Read config target
+      run: |
+        cd openwrt
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\1/' > ARCH_NAME
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\2/' > CPU_NAME
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\3/' > DEVICE_NAME
+        [ -s ARCH_NAME ] && echo "ARCH_NAME=$(cat ARCH_NAME)" >> $GITHUB_ENV
+        [ -s CPU_NAME ] && echo "CPU_NAME=$(cat CPU_NAME)" >> $GITHUB_ENV
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo -e "Arch: $(cat ARCH_NAME)\nCPU: $(cat CPU_NAME)\nDevice: $(cat DEVICE_NAME)"
+
+    - name: Compile the firmware
+      id: compile
+      run: |
+        cd openwrt
+        echo "$VERMAGIC" > ./vermagic
+        echo -e "Available core: $(nproc)"
+        COMPILE_THREADS=$(($(nproc) + 1))
+        echo "Compile threads: ${COMPILE_THREADS}"
+        make -j${COMPILE_THREADS} V=s 2>&1 | tee build.log || make -j1 V=s 2>&1 | tee build_j1.log
+        [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-squashfs-sysupgrade.bin ] && echo "status=success" >> $GITHUB_OUTPUT
+        cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
+        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log build_j1.log defconfig.log download.log
+        [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/${ARCH_PACKAGES}_packages.zip bin/packages/$ARCH_PACKAGES/
+        echo "Make Completed"
+
+    - name: Prepare release
+      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        touch release.txt
+        echo "Branch: $REPO_BRANCH" >> release.txt
+        echo "TAG: $REPO_TAG" >> release.txt
+        echo "Date: $(date +"%Y-%m-%d_%H:%M")" >> release.txt
+        echo "Arch: $ARCH_NAME" >> release.txt
+        echo "CPU: $CPU_NAME" >> release.txt
+        echo "Deivce: $DEVICE_NAME" >> release.txt
+        cd openwrt/bin/targets/$ARCH_NAME/$CPU_NAME
+        [ -d packages ] && zip -r ${CPU_NAME}_packages.zip packages/
+        [ -d packages ] && rm -rf packages
+        echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
+        echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
+
+    - name: Upload release
+      uses: softprops/action-gh-release@v1
+      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.REPO_BRANCH }}_ath79_sfe
+        body_path: release.txt
+        files: ${{ env.FIRMWARE_PATH }}/*

@@ -1,0 +1,738 @@
+From ef02b4a5f553359b16d08264086177952ed0ee43 Mon Sep 17 00:00:00 2001
+From: quarkysg <hhtan72@yahoo.com>
+Date: Tue, 27 Jul 2021 16:24:09 +0800
+Subject: [PATCH] qca-ssdk: QCA SSDK
+
+Driver for GMAC/switch manipulation
+---
+ package/qca/qca-ssdk/Makefile                 | 146 ++++++++++++
+ package/qca/qca-ssdk/files/qca-ssdk           | 206 ++++++++++++++++++
+ .../patches/100-kernel-5.4-support.patch      | 110 ++++++++++
+ .../qca-ssdk/patches/200-fix-mdio-probe.patch |  11 +
+ .../patches-5.4/999-05-qca-ssdk-support.patch | 109 +++++++++
+ .../patches-5.4/999-05-qca-ssdk-support.patch |  99 +++++++++
+ 6 files changed, 681 insertions(+)
+ create mode 100644 package/qca/qca-ssdk/Makefile
+ create mode 100644 package/qca/qca-ssdk/files/qca-ssdk
+ create mode 100644 package/qca/qca-ssdk/patches/100-kernel-5.4-support.patch
+ create mode 100644 package/qca/qca-ssdk/patches/200-fix-mdio-probe.patch
+ create mode 100644 target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch
+ create mode 100644 target/linux/ath79/patches-5.4/999-05-qca-ssdk-support.patch
+
+diff --git a/package/qca/qca-ssdk/Makefile b/package/qca/qca-ssdk/Makefile
+new file mode 100644
+index 0000000000000..376b32d96a8ce
+--- /dev/null
++++ b/package/qca/qca-ssdk/Makefile
+@@ -0,0 +1,145 @@
++
++include $(TOPDIR)/rules.mk
++include $(INCLUDE_DIR)/kernel.mk
++
++PKG_NAME:=qca-ssdk
++PKG_RELEASE:=1
++
++PKG_SOURCE_URL:=https://source.codeaurora.org/quic/qsdk/oss/lklm/qca-ssdk
++PKG_SOURCE_PROTO:=git
++PKG_SOURCE_VERSION:=92db8b868f7173646d45aeffef6acc891dcbd09c
++PKG_MIRROR_HASH:=f7da17486b4e46f942cdb390e57e8ffe7131c5f74198c09e9d8cf3fdccb58c1e
++
++LOCAL_VARIANT=$(patsubst qca-ssdk-%,%,$(patsubst qca-ssdk-%,%,$(BUILD_VARIANT)))
++include $(INCLUDE_DIR)/package.mk
++
++define KernelPackage/qca-ssdk/default-nohnat
++  SECTION:=kernel
++  CATEGORY:=Kernel modules
++  SUBMENU:=Network Devices
++  TITLE:=Kernel driver for QCA SSDK
++  FILES:=$(PKG_BUILD_DIR)/build/bin/qca-ssdk.ko
++  AUTOLOAD:=$(call AutoLoad,30,qca-ssdk)
++  PROVIDES:=qca-ssdk
++endef
++
++define KernelPackage/qca-ssdk-nohnat
++$(call KernelPackage/qca-ssdk/default-nohnat)
++  DEPENDS:=@!(TARGET_ipq_ipq40xx||TARGET_ipq40xx)||TARGET_ar71xx
++  VARIANT:=nohnat
++endef
++
++define KernelPackage/qca-ssdk-nohnat/description
++This package contains a qca-ssdk driver for QCA chipset
++endef
++
++define KernelPackage/qca-ssdk-hnat
++$(call KernelPackage/qca-ssdk/default-nohnat)
++  DEPENDS:=@TARGET_ipq_ipq40xx||TARGET_ipq40xx||TARGET_ar71xx||TARGET_ipq806x +kmod-ipt-extra +kmod-ipt-filter +(TARGET_ipq806x||TARGET_ipq):kmod-qca-rfs +kmod-ppp
++  TITLE+= (hnat)
++  VARIANT:=hnat
++endef
++
++define KernelPackage/qca-ssdk-hnat/description
++This package contains a qca-ssdk-hnat driver for QCA chipset
++endef
++
++ifeq ($(CONFIG_TARGET_ipq),y)
++subtarget:=$(SUBTARGET)
++else
++subtarget:=ipq806x
++endif
++
++ifdef CONFIG_TOOLCHAIN_BIN_PATH
++TOOLCHAIN_BIN_PATH=$(CONFIG_TOOLCHAIN_BIN_PATH)
++else
++TOOLCHAIN_BIN_PATH=$(TOOLCHAIN_DIR)/bin
++endif
++
++ifdef CONFIG_TARGET_NAME
++QCASSDK_CONFIG_OPTS+= \
++		      TARGET_NAME=$(CONFIG_TARGET_NAME)
++endif
++
++QCASSDK_CONFIG_OPTS+= TOOL_PATH=$(TOOLCHAIN_BIN_PATH) \
++                SYS_PATH=$(LINUX_DIR) \
++                TOOLPREFIX=$(TARGET_CROSS) \
++                KVER=$(LINUX_VERSION) \
++                ARCH=$(LINUX_KARCH) \
++		TARGET_SUFFIX=$(CONFIG_TARGET_SUFFIX) \
++		GCC_VERSION=$(GCC_VERSION) \
++		CFLAGS=-I$(STAGING_DIR)/usr/include
++
++ifeq ($(LOCAL_VARIANT),hnat)
++    QCASSDK_CONFIG_OPTS+= HNAT_FEATURE=enable
++ifeq ($(CONFIG_TARGET_ar71xx),)
++    QCASSDK_CONFIG_OPTS+= RFS_FEATURE=enable
++endif
++endif
++
++ifneq (, $(findstring $(subtarget), ipq60xx ipq60xx_64 ipq807x ipq807x_64))
++    QCASSDK_CONFIG_OPTS+= PTP_FEATURE=enable
++endif
++
++ifneq (, $(findstring $(CONFIG_KERNEL_IPQ_MEM_PROFILE), 256 512))
++ifneq (, $(findstring $(subtarget), ipq807x ipq807x_64))
++    QCASSDK_CONFIG_OPTS+= CHIP_TYPE=HPPE
++else ifneq (, $(findstring $(subtarget), ipq60xx ipq60xx_64))
++    QCASSDK_CONFIG_OPTS+= CHIP_TYPE=CPPE
++else ifneq (, $(findstring $(subtarget), ipq50xx ipq50xx_64))
++    QCASSDK_CONFIG_OPTS+= CHIP_TYPE=MP
++endif
++    QCASSDK_CONFIG_OPTS+= MINI_SSDK=enable
++    QCASSDK_CONFIG_OPTS+= PTP_FEATURE=disable
++endif
++
++ifneq (, $(findstring $(subtarget), ipq50xx ipq50xx_64))
++	QCASSDK_CONFIG_OPTS+= RUMI_FEATURE=enable
++endif
++
++ifeq ($(CONFIG_TARGET_ipq806x_QSDK_Standard),)
++    QCASSDK_CONFIG_OPTS+= HK_CHIP=enable
++endif
++
++define Build/InstallDev
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk/api
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk/ref
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk/fal
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk/sal
++	$(INSTALL_DIR) $(1)/usr/include/qca-ssdk/init
++	$(CP) -rf $(PKG_BUILD_DIR)/include/api/sw_ioctl.h $(1)/usr/include/qca-ssdk/api
++	if [ -f $(PKG_BUILD_DIR)/include/ref/ref_vsi.h ]; then \
++	$(CP) -rf $(PKG_BUILD_DIR)/include/ref/ref_vsi.h $(1)/usr/include/qca-ssdk/ref/; \
++	fi
++	if [ -f $(PKG_BUILD_DIR)/include/ref/ref_fdb.h ]; then \
++	$(CP) -rf $(PKG_BUILD_DIR)/include/ref/ref_fdb.h $(1)/usr/include/qca-ssdk/ref/; \
++	fi
++	if [ -f $(PKG_BUILD_DIR)/include/ref/ref_port_ctrl.h ]; then \
++	$(CP) -rf $(PKG_BUILD_DIR)/include/ref/ref_port_ctrl.h $(1)/usr/include/qca-ssdk/ref/; \
++	fi
++	if [ -f $(PKG_BUILD_DIR)/include/init/ssdk_init.h ]; then \
++	$(CP) -rf $(PKG_BUILD_DIR)/include/init/ssdk_init.h $(1)/usr/include/qca-ssdk/init/; \
++	fi
++	$(CP) -rf $(PKG_BUILD_DIR)/include/fal $(1)/usr/include/qca-ssdk
++	$(CP) -rf $(PKG_BUILD_DIR)/include/common/*.h $(1)/usr/include/qca-ssdk
++	$(CP) -rf $(PKG_BUILD_DIR)/include/sal/os/linux/*.h $(1)/usr/include/qca-ssdk
++	$(CP) -rf $(PKG_BUILD_DIR)/include/sal/os/*.h $(1)/usr/include/qca-ssdk
++
++endef
++
++define Build/Compile
++	$(MAKE) -C $(PKG_BUILD_DIR) $(strip $(QCASSDK_CONFIG_OPTS))
++endef
++
++define KernelPackage/qca-ssdk-nohnat/install
++	$(INSTALL_DIR) $(1)/etc/init.d
++	$(INSTALL_BIN) ./files/qca-ssdk $(1)/etc/init.d/qca-ssdk
++endef
++
++define KernelPackage/qca-ssdk-hnat/install
++	$(INSTALL_DIR) $(1)/etc/init.d
++	$(INSTALL_BIN) ./files/qca-ssdk $(1)/etc/init.d/qca-ssdk
++endef
++
++$(eval $(call KernelPackage,qca-ssdk-nohnat))
++$(eval $(call KernelPackage,qca-ssdk-hnat))
+diff --git a/package/qca/qca-ssdk/files/qca-ssdk b/package/qca/qca-ssdk/files/qca-ssdk
+new file mode 100644
+index 0000000000000..389279c0cbc84
+--- /dev/null
++++ b/package/qca/qca-ssdk/files/qca-ssdk
+@@ -0,0 +1,206 @@
++#!/bin/sh /etc/rc.common
++# Copyright (c) 2018, The Linux Foundation. All rights reserved.
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++#
++
++START=16
++
++#!/bin/sh
++ruletype="ip4 ip6"
++side="wan lan"
++qwan="1 3 2 0 5 7 6 4"
++qlan="0 1 2 3 4 5 6 7"
++
++function create_war_acl_rules(){
++	for lw in $side
++	do
++		#echo $lw
++		if [ "$lw" == "wan" ];then
++			listid=254
++			queue=$qwan
++			portmap=0x20
++		else
++			listid=255
++			queue=$qlan
++			portmap=0x1e
++		fi
++		#echo $queue
++		#echo "creating list $listid"
++		ssdk_sh acl list create $listid 255
++		ruleid=0
++		for rt in $ruletype
++		do
++			for qid in $queue
++			do
++				cmd="ssdk_sh acl rule add $listid $ruleid  1 n 0 0"
++				#echo $cmd
++				if [ "$rt" == "ip4" ];then
++					cmd="$cmd ip4 n n n n n n n n n n n n n n n n n n n n n n n n n n n n n"
++					#echo $cmd
++				else
++					cmd="$cmd ip6 n n n n n n n n n n n n n n n n n n n n n n n n n n n n n n n"
++					#echo $cmd
++				fi
++				if [ $ruleid -le 3 ];then
++					#non-zero dscp
++					cmd="$cmd y 0x0 0xff"
++				elif [ $ruleid -le 7 ];then
++					#zero dscp
++					cmd="$cmd n"
++				elif [ $ruleid -le 11 ];then
++					#non-zero dscp
++					cmd="$cmd y 0x0 0xff"
++				else
++					#zero dscp
++					cmd="$cmd n"
++				fi
++				p=$((ruleid/2))
++				cmd="$cmd y mask $((ruleid%2)) 0x1 y mask $((p%2)) 0x1 n n n n n n n n n n n n n n n y n n n n n n n y $qid n n 0 0 n n n n n n n n n n n n n n n n n n n n 0"
++				#echo $cmd
++				$cmd
++				ruleid=`expr $ruleid + 1`
++			done
++		done
++		ssdk_sh acl list bind $listid 0 1 $portmap
++	done
++}
++
++function create_war_cosmap(){
++	ssdk_sh cosmap pri2q set 0 0
++	ssdk_sh cosmap pri2q set 1 0
++	ssdk_sh cosmap pri2q set 2 0
++	ssdk_sh cosmap pri2q set 3 0
++	ssdk_sh cosmap pri2q set 4 1
++	ssdk_sh cosmap pri2q set 5 1
++	ssdk_sh cosmap pri2q set 6 1
++	ssdk_sh cosmap pri2q set 7 1
++	ssdk_sh cosmap pri2ehq set 0 0
++	ssdk_sh cosmap pri2ehq set 1 0
++	ssdk_sh cosmap pri2ehq set 2 0
++	ssdk_sh cosmap pri2ehq set 3 0
++	ssdk_sh cosmap pri2ehq set 4 1
++	ssdk_sh cosmap pri2ehq set 5 1
++	ssdk_sh cosmap pri2ehq set 6 1
++	ssdk_sh cosmap pri2ehq set 7 1
++}
++
++function create_acl_byp_egstp_rules(){
++	ssdk_sh debug module_func set servcode 0xf 0x0 0x0
++	ssdk_sh servcode config set 1 n 0 0xfffefc7f 0xffbdff 0 0 0 0 0 0
++	ssdk_sh debug module_func set servcode 0x0 0x0 0x0
++	ssdk_sh acl list create 56 48
++	ssdk_sh acl rule add 56 0 1 n 0 0 mac n n n n n y 01-80-c2-00-00-00 ff-ff-ff-ff-ff-ff n n n n n n n n n n n n n n n n n n n n n n n y n n n n n n n n n n 0 0 n n n n n n n n n n n n n y n n n n n n n n n n n n y n n n n n n n n n n n n 0
++	ssdk_sh acl rule add 56 1 1 n 0 0 mac n n n n n n n yes 0x8809 0xffff n n n n n n n n n n n n n n n n n n n n n y n n n n n n n n n n 0 0 n n n n n n n n n n n n n y n n n n n n n n n n n n y n n n n n n n n n n n n 0
++	ssdk_sh acl rule add 56 2 1 n 0 0 mac n n n n n n n yes 0x888e 0xffff n n n n n n n n n n n n n n n n n n n n n y n n n n n n n n n n 0 0 n n n n n n n n n n n n n y n n n n n n n n n n n n y n n n n n n n n n n n n 0
++	ssdk_sh acl list bind 56 0 2 1
++}
++
++function delete_war_acl_rules(){
++	for lw in $side
++	do
++		#echo $lw
++		if [ "$lw" == "wan" ];then
++			listid=254
++			queue=$qwan
++			portmap=0x20
++		else
++			listid=255
++			queue=$qlan
++			portmap=0x1e
++		fi
++		ssdk_sh acl list unbind $listid 0 1 $portmap
++		for rt in $ruletype
++		do
++			for qid in $queue
++			do
++				cmd="ssdk_sh acl rule del $listid 0 1"
++				echo $cmd
++				$cmd
++			done
++		done
++		#echo "deleting list $listid"
++		ssdk_sh acl list destroy $listid
++	done
++}
++
++function delete_war_cosmap(){
++	ssdk_sh cosmap pri2q set 0 0
++	ssdk_sh cosmap pri2q set 1 0
++	ssdk_sh cosmap pri2q set 2 1
++	ssdk_sh cosmap pri2q set 3 1
++	ssdk_sh cosmap pri2q set 4 2
++	ssdk_sh cosmap pri2q set 5 2
++	ssdk_sh cosmap pri2q set 6 3
++	ssdk_sh cosmap pri2q set 7 3
++	ssdk_sh cosmap pri2ehq set 0 1
++	ssdk_sh cosmap pri2ehq set 1 0
++	ssdk_sh cosmap pri2ehq set 2 2
++	ssdk_sh cosmap pri2ehq set 3 2
++	ssdk_sh cosmap pri2ehq set 4 3
++	ssdk_sh cosmap pri2ehq set 5 3
++	ssdk_sh cosmap pri2ehq set 6 4
++	ssdk_sh cosmap pri2ehq set 7 5
++}
++
++function delete_acl_byp_egstp_rules(){
++	ssdk_sh debug module_func set servcode 0xf 0x0 0x0
++	ssdk_sh servcode config set 1 n 0 0xfffefcff 0xffbfff 0 0 0 0 0 0
++	ssdk_sh debug module_func set servcode 0x0 0x0 0x0
++	ssdk_sh acl list unbind 56 0 2 1
++	ssdk_sh acl rule del 56 0 1
++	ssdk_sh acl rule del 56 1 1
++	ssdk_sh acl rule del 56 2 1
++	ssdk_sh acl list destroy 56
++}
++
++function edma_war_config_add(){
++	create_war_cosmap
++	ssdk_sh acl status set enable
++	create_war_acl_rules
++}
++
++function edma_war_config_del(){
++	delete_war_acl_rules
++	delete_war_cosmap
++}
++
++start() {
++	chip_ver=`ssdk_sh debug reg get 0 4 | grep Data | tr -d 'SSDK Init OK![Data]:'`
++	#The following commands should be uncommented to enable EDMA WAR
++	if [ "$chip_ver" = "0x1401" ]; then
++		#edma_war_config_add
++		echo ''
++	fi
++	#The following commands should be uncommented to add acl egress stp bypass rules
++	if [ "$chip_ver" = "0x1500" ] || [ "$chip_ver" = "0x1501" ]; then
++		#create_acl_byp_egstp_rules
++		echo ''
++	fi
++	echo starting
++}
++
++stop() {
++	chip_ver=`ssdk_sh debug reg get 0 4 | grep Data | tr -d 'SSDK Init OK![Data]:'`
++	#The following commands should be uncommented to disable EDMA WAR
++	if [ "$chip_ver" = "0x1401" ]; then
++		#edma_war_config_del
++		echo ''
++	fi
++	#The following commands should be uncommented to delete acl egress stp bypass rules
++	if [ "$chip_ver" = "0x1500" ] || [ "$chip_ver" = "0x1501" ]; then
++		#delete_acl_byp_egstp_rules
++		echo ''
++	fi
++	echo stoping
++}
+diff --git a/package/qca/qca-ssdk/patches/100-kernel-5.4-support.patch b/package/qca/qca-ssdk/patches/100-kernel-5.4-support.patch
+new file mode 100644
+index 0000000000000..880dddb1d75d4
+--- /dev/null
++++ b/package/qca/qca-ssdk/patches/100-kernel-5.4-support.patch
+@@ -0,0 +1,110 @@
++--- a/app/nathelper/linux/lib/nat_helper_dt.c
+++++ b/app/nathelper/linux/lib/nat_helper_dt.c
++@@ -721,7 +721,7 @@ napt_ct_counter_sync(a_uint32_t hw_index
++ 	}
++ 	
++ 	if (!test_bit(IPS_FIXED_TIMEOUT_BIT, &ct->status)) {
++-		ct->timeout.expires += delta_jiffies;
+++		ct->timeout += delta_jiffies;
++ 	}
++ 
++ 	if((cct != NULL) && (napt_hw_get_by_index(&napt, hw_index) == 0))
++@@ -770,7 +770,7 @@ napt_ct_timer_update(a_uint32_t hw_index
++ 	}
++ 
++ 	if (!test_bit(IPS_FIXED_TIMEOUT_BIT, &ct->status)) {
++-		ct->timeout.expires += delta_jiffies;
+++		ct->timeout += delta_jiffies;
++ 	}
++ 
++ 	return 0;
++--- a/app/nathelper/linux/napt_helper.c
+++++ b/app/nathelper/linux/napt_helper.c
++@@ -64,11 +64,6 @@ napt_ct_aging_disable(uint32_t ct_addr)
++     }
++ 
++ 	ct = (struct nf_conn *)ct_addr;
++-
++-    if (timer_pending(&ct->timeout))
++-    {
++-        del_timer(&ct->timeout);
++-    }
++ }
++ 
++ int
++@@ -85,7 +80,7 @@ napt_ct_aging_is_enable(uint32_t ct_addr
++ 
++ 	ct = (struct nf_conn *)ct_addr;
++ 
++-    return timer_pending(&(((struct nf_conn *)ct)->timeout));
+++    return (nf_ct_is_expired(ct));
++ }
++ 
++ void
++@@ -111,18 +106,17 @@ napt_ct_aging_enable(uint32_t ct_addr)
++ 	l3num = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.l3num;
++ 	protonum = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum;
++ 
++-    ct->timeout.expires = jiffies+10*HZ;
+++    ct->timeout = jiffies+10*HZ;
++ 
++     if ((l3num == AF_INET) && (protonum == IPPROTO_TCP))
++     {
++         if (ct->proto.tcp.state == TCP_CONNTRACK_ESTABLISHED)
++         {
++-            ct->timeout.expires = jiffies+(5*24*60*60*HZ);
+++            ct->timeout = jiffies+(5*24*60*60*HZ);
++         }
++     }
++ 
++     HNAT_PRINTK("<aging> ct:[%x] add timeout again\n",  ct_addr);
++-    add_timer(&ct->timeout);
++ }
++ 
++ void
++@@ -339,7 +333,6 @@ napt_ct_list_unlock(void)
++ uint32_t
++ napt_ct_list_iterate(uint32_t *hash, uint32_t *iterate)
++ {
++-	struct net *net = &init_net;
++ 	struct nf_conntrack_tuple_hash *h = NULL;
++ 	struct nf_conn *ct = NULL;
++ 	struct hlist_nulls_node *pos = (struct hlist_nulls_node *) (*iterate);
++@@ -349,7 +342,7 @@ napt_ct_list_iterate(uint32_t *hash, uin
++ 		if(pos == 0)
++ 		{
++ 			/*get head for list*/
++-			pos = rcu_dereference((&net->ct.hash[*hash])->first);
+++			pos = rcu_dereference(hlist_nulls_first_rcu(&nf_conntrack_hash[*hash]));
++ 		}
++ 
++ 		hlist_nulls_for_each_entry_from(h, pos, hnnode)
++--- a/app/nathelper/linux/nat_ipt_helper.c
+++++ b/app/nathelper/linux/nat_ipt_helper.c
++@@ -534,10 +534,10 @@ nat_ipt_data_init(void)
++     memset(&old_replace, 0, sizeof (old_replace));
++ 
++     /*record ipt rule(SNAT) sequence for hw nat*/
++-    memset(hw_nat_ipt_seq, 0, NAT_HW_NUM);
+++    memset(hw_nat_ipt_seq, 0, sizeof(hw_nat_ipt_seq));
++ 
++     /*record ipt rule(SNAT) pubip index for hw nat*/
++-    memset(hw_nat_pip_idx, 0, NAT_HW_NUM);
+++    memset(hw_nat_pip_idx, 0, sizeof(hw_nat_pip_idx));
++ }
++ 
++ static void
++--- a/make/linux_opt.mk
+++++ b/make/linux_opt.mk
++@@ -434,10 +434,7 @@ ifeq (KSLIB, $(MODULE_TYPE))
++ 
++ 	    else ifeq ($(ARCH), arm)
++ 	    MODULE_INC += -I$(SYS_PATH) \
++-              -I$(TOOL_PATH)/../lib/gcc/$(TARGET_NAME)/$(GCC_VERSION)/include/ \
++-	      -I$(TOOL_PATH)/../lib/gcc/$(TARGET_NAME)/7.5.0/include/ \
++-              -I$(TOOL_PATH)/../../lib/armv7a-vfp-neon-rdk-linux-gnueabi/gcc/arm-rdk-linux-gnueabi/4.8.4/include/ \
++-	      -I$(TOOL_PATH)/../../lib/arm-rdk-linux-musleabi/gcc/arm-rdk-linux-musleabi/6.4.0/include/ \
+++              -I$(TOOL_PATH)/../lib/gcc/$(TARGET_NAME)/$(GCC_VERSION)/include/ \
++               -I$(SYS_PATH)/include \
++               -I$(SYS_PATH)/source \
++               -I$(SYS_PATH)/source/include \
+diff --git a/package/qca/qca-ssdk/patches/200-fix-mdio-probe.patch b/package/qca/qca-ssdk/patches/200-fix-mdio-probe.patch
+new file mode 100644
+index 0000000000000..ea2f6dc3eb03b
+--- /dev/null
++++ b/package/qca/qca-ssdk/patches/200-fix-mdio-probe.patch
+@@ -0,0 +1,11 @@
++--- a/src/init/ssdk_plat.c
+++++ b/src/init/ssdk_plat.c
++@@ -566,7 +566,7 @@ static int miibus_get(a_uint32_t dev_id)
++ 	if(reg_mode == HSL_REG_LOCAL_BUS)
++ 		mdio_node = of_find_compatible_node(NULL, NULL, "qcom,ipq40xx-mdio");
++ 	else
++-		mdio_node = of_find_compatible_node(NULL, NULL, "virtual,mdio-gpio");
+++		mdio_node = of_find_compatible_node(NULL, NULL, "qcom,ipq8064-mdio");
++ 
++ 	if (!mdio_node) {
++ 		SSDK_ERROR("No MDIO node found in DTS!\n");
+diff --git a/target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch b/target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch
+new file mode 100644
+index 0000000000000..412b6a271b2aa
+--- /dev/null
++++ b/target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch
+@@ -0,0 +1,109 @@
++--- a/include/linux/switch.h
+++++ b/include/linux/switch.h
++@@ -45,6 +45,9 @@ enum switch_port_speed {
++ 	SWITCH_PORT_SPEED_10 = 10,
++ 	SWITCH_PORT_SPEED_100 = 100,
++ 	SWITCH_PORT_SPEED_1000 = 1000,
+++	SWITCH_PORT_SPEED_2500 = 2500,
+++	SWITCH_PORT_SPEED_5000 = 5000,
+++	SWITCH_PORT_SPEED_10000 = 10000,
++ };
++ 
++ struct switch_port_link {
++@@ -83,6 +86,10 @@ struct switch_port_stats {
++  */
++ struct switch_dev_ops {
++ 	struct switch_attrlist attr_global, attr_port, attr_vlan;
+++	struct switch_attrlist attr_reg;
+++
+++	int (*get_reg_val)(struct switch_dev *dev, int reg, int *val);
+++	int (*set_reg_val)(struct switch_dev *dev, int reg, int val);
++ 
++ 	int (*get_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
++ 	int (*set_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
++@@ -146,6 +153,12 @@ struct switch_portmap {
++ 	const char *s;
++ };
++ 
+++struct switch_ext {
+++	const char *option_name;
+++	const char *option_value;
+++	struct switch_ext *next;
+++};
+++
++ struct switch_val {
++ 	const struct switch_attr *attr;
++ 	unsigned int port_vlan;
++@@ -155,6 +168,7 @@ struct switch_val {
++ 		u32 i;
++ 		struct switch_port *ports;
++ 		struct switch_port_link *link;
+++		struct switch_ext *ext_val;
++ 	} value;
++ };
++ 
++--- a/include/uapi/linux/switch.h
+++++ b/include/uapi/linux/switch.h
++@@ -47,13 +47,17 @@ enum {
++ 	SWITCH_ATTR_OP_NAME,
++ 	SWITCH_ATTR_OP_PORT,
++ 	SWITCH_ATTR_OP_VLAN,
+++	SWITCH_ATTR_OP_REG,
++ 	SWITCH_ATTR_OP_VALUE_INT,
++ 	SWITCH_ATTR_OP_VALUE_STR,
++ 	SWITCH_ATTR_OP_VALUE_PORTS,
++ 	SWITCH_ATTR_OP_VALUE_LINK,
+++	SWITCH_ATTR_OP_VALUE_EXT,
++ 	SWITCH_ATTR_OP_DESCRIPTION,
++ 	/* port lists */
++ 	SWITCH_ATTR_PORT,
+++	/* switch_ext attribute */
+++	SWITCH_ATTR_EXT,
++ 	SWITCH_ATTR_MAX
++ };
++ 
++@@ -78,7 +82,10 @@ enum {
++ 	SWITCH_CMD_SET_PORT,
++ 	SWITCH_CMD_LIST_VLAN,
++ 	SWITCH_CMD_GET_VLAN,
++-	SWITCH_CMD_SET_VLAN
+++	SWITCH_CMD_SET_VLAN,
+++	SWITCH_CMD_LIST_REG,
+++	SWITCH_CMD_GET_REG,
+++	SWITCH_CMD_SET_REG,
++ };
++ 
++ /* data types */
++@@ -88,6 +95,7 @@ enum switch_val_type {
++ 	SWITCH_TYPE_STRING,
++ 	SWITCH_TYPE_PORTS,
++ 	SWITCH_TYPE_LINK,
+++	SWITCH_TYPE_EXT,
++ 	SWITCH_TYPE_NOVAL,
++ };
++ 
++@@ -113,6 +121,14 @@ enum {
++ 	SWITCH_LINK_ATTR_MAX,
++ };
++ 
+++/* switch_ext nested attributes */
+++enum {
+++	SWITCH_EXT_UNSPEC,
+++	SWITCH_EXT_NAME,
+++	SWITCH_EXT_VALUE,
+++	SWITCH_EXT_ATTR_MAX
+++};
+++
++ #define SWITCH_ATTR_DEFAULTS_OFFSET	0x1000
++ 
++ 
++--- a/include/net/ip_fib.h
+++++ b/include/net/ip_fib.h
++@@ -107,6 +107,7 @@ struct fib_nh {
++ #ifdef CONFIG_IP_ROUTE_CLASSID
++ 	__u32			nh_tclassid;
++ #endif
+++	__be32			nh_gw; /* QCA SSDK Support */
++ 	__be32			nh_saddr;
++ 	int			nh_saddr_genid;
++ #define fib_nh_family		nh_common.nhc_family
+diff --git a/target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch b/target/linux/ipq806x/patches-5.4/999-05-qca-ssdk-support.patch
+new file mode 100644
+index 0000000000000..412b6a271b2aa
+--- /dev/null
++++ b/target/linux/ath79/patches-5.4/999-05-qca-ssdk-support.patch
+@@ -0,0 +1,99 @@
++--- a/include/linux/switch.h
+++++ b/include/linux/switch.h
++@@ -83,6 +86,10 @@ struct switch_port_stats {
++  */
++ struct switch_dev_ops {
++ 	struct switch_attrlist attr_global, attr_port, attr_vlan;
+++	struct switch_attrlist attr_reg;
+++
+++	int (*get_reg_val)(struct switch_dev *dev, int reg, int *val);
+++	int (*set_reg_val)(struct switch_dev *dev, int reg, int val);
++ 
++ 	int (*get_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
++ 	int (*set_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
++@@ -146,6 +153,12 @@ struct switch_portmap {
++ 	const char *s;
++ };
++ 
+++struct switch_ext {
+++	const char *option_name;
+++	const char *option_value;
+++	struct switch_ext *next;
+++};
+++
++ struct switch_val {
++ 	const struct switch_attr *attr;
++ 	unsigned int port_vlan;
++@@ -155,6 +168,7 @@ struct switch_val {
++ 		u32 i;
++ 		struct switch_port *ports;
++ 		struct switch_port_link *link;
+++		struct switch_ext *ext_val;
++ 	} value;
++ };
++ 
++--- a/include/uapi/linux/switch.h
+++++ b/include/uapi/linux/switch.h
++@@ -47,13 +47,17 @@ enum {
++ 	SWITCH_ATTR_OP_NAME,
++ 	SWITCH_ATTR_OP_PORT,
++ 	SWITCH_ATTR_OP_VLAN,
+++	SWITCH_ATTR_OP_REG,
++ 	SWITCH_ATTR_OP_VALUE_INT,
++ 	SWITCH_ATTR_OP_VALUE_STR,
++ 	SWITCH_ATTR_OP_VALUE_PORTS,
++ 	SWITCH_ATTR_OP_VALUE_LINK,
+++	SWITCH_ATTR_OP_VALUE_EXT,
++ 	SWITCH_ATTR_OP_DESCRIPTION,
++ 	/* port lists */
++ 	SWITCH_ATTR_PORT,
+++	/* switch_ext attribute */
+++	SWITCH_ATTR_EXT,
++ 	SWITCH_ATTR_MAX
++ };
++ 
++@@ -78,7 +82,10 @@ enum {
++ 	SWITCH_CMD_SET_PORT,
++ 	SWITCH_CMD_LIST_VLAN,
++ 	SWITCH_CMD_GET_VLAN,
++-	SWITCH_CMD_SET_VLAN
+++	SWITCH_CMD_SET_VLAN,
+++	SWITCH_CMD_LIST_REG,
+++	SWITCH_CMD_GET_REG,
+++	SWITCH_CMD_SET_REG,
++ };
++ 
++ /* data types */
++@@ -88,6 +95,7 @@ enum switch_val_type {
++ 	SWITCH_TYPE_STRING,
++ 	SWITCH_TYPE_PORTS,
++ 	SWITCH_TYPE_LINK,
+++	SWITCH_TYPE_EXT,
++ 	SWITCH_TYPE_NOVAL,
++ };
++ 
++@@ -113,6 +121,14 @@ enum {
++ 	SWITCH_LINK_ATTR_MAX,
++ };
++ 
+++/* switch_ext nested attributes */
+++enum {
+++	SWITCH_EXT_UNSPEC,
+++	SWITCH_EXT_NAME,
+++	SWITCH_EXT_VALUE,
+++	SWITCH_EXT_ATTR_MAX
+++};
+++
++ #define SWITCH_ATTR_DEFAULTS_OFFSET	0x1000
++ 
++ 
++--- a/include/net/ip_fib.h
+++++ b/include/net/ip_fib.h
++@@ -107,6 +107,7 @@ struct fib_nh {
++ #ifdef CONFIG_IP_ROUTE_CLASSID
++ 	__u32			nh_tclassid;
++ #endif
+++	__be32			nh_gw; /* QCA SSDK Support */
++ 	__be32			nh_saddr;
++ 	int			nh_saddr_genid;
++ #define fib_nh_family		nh_common.nhc_family
