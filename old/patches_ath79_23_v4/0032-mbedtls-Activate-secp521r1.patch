@@ -1,0 +1,51 @@
+From 3223f31fd384c938c1a5aa01fb496cec64498704 Mon Sep 17 00:00:00 2001
+From: Hauke Mehrtens <hauke@hauke-m.de>
+Date: Sun, 5 Nov 2023 23:05:24 +0100
+Subject: [PATCH] mbedtls: Activate secp521r1 curve by default
+
+Activate the secp521r1 ecliptic curve by default. This curve is allowed
+by the CA/Browser forum, see
+https://cabforum.org/wp-content/uploads/CA-Browser-Forum-BR-v2.0.1-redlined.pdf#page=110
+
+This increases the size of libmbedtls12_2.28.5-1_aarch64_generic.ipk by
+about 400 bytes:
+Without:
+252,696 libmbedtls12_2.28.5-1_aarch64_generic.ipk
+With:
+253,088 libmbedtls12_2.28.5-2_aarch64_generic.ipk
+
+Fixes: #13774
+Acked-by: Koen Vandeputte <koen.vandeputte@citymesh.com>
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+(cherry picked from commit 3c17cdbc369d89ff6a7911c3acff2e493778f6c1)
+---
+ package/libs/mbedtls/Config.in | 2 +-
+ package/libs/mbedtls/Makefile  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/package/libs/mbedtls/Config.in b/package/libs/mbedtls/Config.in
+index ffabd799d32b6..9fbe9f8a4a0ff 100644
+--- a/package/libs/mbedtls/Config.in
++++ b/package/libs/mbedtls/Config.in
+@@ -104,7 +104,7 @@ config MBEDTLS_ECP_DP_SECP384R1_ENABLED
+ 
+ config MBEDTLS_ECP_DP_SECP521R1_ENABLED
+ 	bool "MBEDTLS_ECP_DP_SECP521R1_ENABLED"
+-	default n
++	default y
+ 
+ config MBEDTLS_ECP_DP_SECP192K1_ENABLED
+ 	bool "MBEDTLS_ECP_DP_SECP192K1_ENABLED"
+diff --git a/package/libs/mbedtls/Makefile b/package/libs/mbedtls/Makefile
+index 6f0b5162ebf6a..246b21a8531a1 100644
+--- a/package/libs/mbedtls/Makefile
++++ b/package/libs/mbedtls/Makefile
+@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=mbedtls
+ PKG_VERSION:=2.28.5
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ PKG_BUILD_FLAGS:=no-mips16 gc-sections no-lto
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
