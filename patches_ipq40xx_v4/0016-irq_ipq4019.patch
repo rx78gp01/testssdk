@@ -1,0 +1,36 @@
+From 89106efc0d25fb356dff221a8f544967ac88c6f4 Mon Sep 17 00:00:00 2001
+From: DENG Qingfang <dqfext@gmail.com>
+Date: Fri, 4 Feb 2022 17:52:03 +0800
+Subject: [PATCH] ipq40xx: irq balance
+
+---
+ .../base-files/etc/init.d/set-irq-affinity    | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100755 target/linux/ipq40xx/base-files/etc/init.d/set-irq-affinity
+
+diff --git a/target/linux/ipq40xx/base-files/etc/init.d/set-irq-affinity b/target/linux/ipq40xx/base-files/etc/init.d/set-irq-affinity
+new file mode 100755
+index 00000000000000..e0ce4ad6b7356a
+--- /dev/null
++++ b/target/linux/ipq40xx/base-files/etc/init.d/set-irq-affinity
+@@ -0,0 +1,20 @@
++#!/bin/sh /etc/rc.common
++
++START=99
++
++start() {
++	local mask=4
++	for irq in $(grep -F ath10k_ahb /proc/interrupts | cut -d: -f1 | sed 's, *,,')
++	do
++		echo "$mask" > "/proc/irq/$irq/smp_affinity"
++		[ $mask = 4 ] && mask=8
++	done
++
++	mask=1
++	for irq in $(grep -F c080000.ethernet /proc/interrupts | cut -d: -f1 | sed 's, *,,')
++	do
++		echo "$mask" > "/proc/irq/$irq/smp_affinity"
++		mask=$((mask << 1))
++		[ $mask = 16 ] && mask=1
++	done
++}
