@@ -113,6 +113,8 @@ jobs:
         [ -d openwrt/staging_dir ] && echo "Found staging_dir cache" || echo "No staging_dir cache"
         [ -d openwrt/build_dir ] && echo "Found build_dir cache" || echo "No build_dir cache"
         [ -d openwrt/dl ] && echo "Found dl cache" ||  echo "No dl cache"
+        [ -d openwrt/staging_dir/cache/llvm-bpf ] && cp -P openwrt/staging_dir/cache/llvm-bpf openwrt/llvm-bpf && \
+        cp -R openwrt/staging_dir/cache/llvm-bpf/llvm-bpf-15.0.7.Linux-x86_64 openwrt/llvm-bpf-15.0.7.Linux-x86_64
         ls -al openwrt
 
     - name: Setup feeds
