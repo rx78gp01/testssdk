@@ -120,7 +120,6 @@ jobs:
         [ -e $FEEDS_CONF ] && cp $FEEDS_CONF openwrt/feeds.conf
         cd openwrt
         ./scripts/feeds update -a
-        ./scripts/feeds update -i
         ./scripts/feeds install -a
 
     - name: Apply patches
@@ -153,6 +152,7 @@ jobs:
       run: |
         cd openwrt
         make defconfig  V=s 2>&1 | tee defconfig.log
+        make toolchain/install
         make download -j2  V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
