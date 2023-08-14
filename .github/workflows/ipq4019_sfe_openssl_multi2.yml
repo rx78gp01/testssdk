@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.0 ipq40xx sfe openssl
+name: Build OpenWrt 23.05.0 ipq40xx sfe openssl multi2
 
 on:
   workflow_dispatch:
@@ -14,9 +14,9 @@ env:
   ARCH_PACKAGES: arm_cortex-a7_neon-vfpv4
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23050
-  CONFIG_FILE: .config_ipq40xx_sfe_openssl
+  CONFIG_FILE: .config_ipq40xx_sfe_openssl_multi_v2
   FILES_PATH: files_ipq40xx_sfe
-  PATCHES_PATH: patches_ipq40xx
+  PATCHES_PATH: patches_ipq40xx_v2
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DIR: false
@@ -133,6 +133,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/else/else if (sdata->flags \&\& IEEE80211_SDATA_IN_DRIVER)/g' package/kernel/mac80211/patches/subsys/333-wifi-mac80211-add-flush_sta-method.patch
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -156,17 +157,17 @@ jobs:
       run: |
         cd openwrt
         make defconfig  V=s 2>&1 | tee defconfig.log
-        make toolchain/install
-        make download -j2  V=s 2>&1 | tee download.log
+        make toolchain/install V=sc
+        make download -j2 V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
     
     - name: Read config target
       run: |
         cd openwrt
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\1/' > ARCH_NAME
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\2/' > CPU_NAME
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/^CONFIG_TARGET_(.*)_(.*)_DEVICE_(.*)=y/\3/' > DEVICE_NAME
+        echo "ipq40xx" > ARCH_NAME
+        echo "generic" > CPU_NAME
+        echo "linksys_ea8300" > DEVICE_NAME
         [ -s ARCH_NAME ] && echo "ARCH_NAME=$(cat ARCH_NAME)" >> $GITHUB_ENV
         [ -s CPU_NAME ] && echo "CPU_NAME=$(cat CPU_NAME)" >> $GITHUB_ENV
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -216,6 +217,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_multi2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
