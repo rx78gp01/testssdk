@@ -77,7 +77,8 @@ CONFIG_PACKAGE_ucode-mod-math=y
 CONFIG_PACKAGE_uhttpd=y
 CONFIG_PACKAGE_uhttpd-mod-ubus=y
 # CONFIG_PACKAGE_wpad-basic-mbedtls is not set
-CONFIG_PACKAGE_wpad-basic-openssl=y
+# CONFIG_PACKAGE_wpad-basic-openssl is not set
+CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_xdp-filter=m
 CONFIG_PACKAGE_xdp-loader=m
 CONFIG_PACKAGE_xdpdump=m
