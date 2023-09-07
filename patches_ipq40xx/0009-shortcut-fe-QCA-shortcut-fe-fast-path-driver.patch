@@ -12119,7 +12119,7 @@ new file mode 100644
 index 0000000..eb3366b
 --- /dev/null
 +++ b/target/linux/generic/hack-5.15/952-add-net-conntrack-events-support-multiple-registrant.patch
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,355 @@
 +From 42824d4b753f84ccf885eca602c5037338b546c8 Mon Sep 17 00:00:00 2001
 +From: Zhi Chen <zhichen@codeaurora.org>
 +Date: Tue, 13 Jan 2015 14:28:18 -0800
@@ -12428,6 +12428,22 @@ index 0000000..eb3366b
 + 	struct nf_conn *ct = item->ct;
 + 	struct sk_buff *skb;
 + 	unsigned int type;
++@@ -3112,6 +3112,7 @@ nla_put_failure:
++ }
++ 
++ #ifdef CONFIG_NF_CONNTRACK_EVENTS
+++#ifndef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
++ static int
++ ctnetlink_expect_event(unsigned int events, const struct nf_exp_event *item)
++ {
++@@ -3161,6 +3162,7 @@ errout:
++ 	return 0;
++ }
++ #endif
+++#endif
++ static int ctnetlink_exp_done(struct netlink_callback *cb)
++ {
++ 	if (cb->args[1])
 +@@ -3765,11 +3772,17 @@ static int ctnetlink_stat_exp_cpu(struct
 + }
 + 
