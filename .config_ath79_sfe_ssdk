@@ -19,6 +19,7 @@ CONFIG_LIBCURL_NO_SMB="!"
 CONFIG_LIBCURL_PROXY=y
 CONFIG_LIBCURL_WOLFSSL=y
 CONFIG_PACKAGE_cgi-io=y
+CONFIG_PACKAGE_kmod-ath10k-ct-smallbuffers=m
 CONFIG_PACKAGE_kmod-fast-classifier=y
 CONFIG_PACKAGE_kmod-ipt-extra=y
 CONFIG_PACKAGE_kmod-ipt-filter=y
