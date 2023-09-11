@@ -648,7 +648,7 @@ new file mode 100644
 index 0000000000000..3d68c35a310bc
 --- /dev/null
 +++ b/package/kernel/qca/shortcut-fe/shortcut-fe/files/etc/init.d/shortcut-fe
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,51 @@
 +#!/bin/sh /etc/rc.common
 +#
 +# Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
@@ -677,7 +677,7 @@ index 0000000000000..3d68c35a310bc
 +#load shortcut-fe connection manager
 +load_sfe() {
 +	local kernel_version=$(uname -r)
-+
++	sysctl -w net.netfilter.nf_conntrack_tcp_no_window_check=1
 +#	[ -d /sys/module/shortcut_fe_drv ] && rmmod shortcut_fe_drv
 +	[ ! -d /sys/module/shortcut_fe ] && insmod /lib/modules/$kernel_version/shortcut-fe.ko
 +	[ ! -d /sys/module/shortcut_fe_ipv6 ] && insmod /lib/modules/$kernel_version/shortcut-fe-ipv6.ko
@@ -698,6 +698,7 @@ index 0000000000000..3d68c35a310bc
 +	[ -d /sys/module/shortcut_fe_ipv6 ] && rmmod shortcut_fe_ipv6
 +	[ -d /sys/module/shortcut_fe ] && rmmod shortcut_fe
 +#	[ -d /sys/module/shortcut_fe_drv ] && rmmod shortcut_fe_drv
++	sysctl -w net.netfilter.nf_conntrack_tcp_no_window_check=0
 +}
 diff --git a/package/kernel/qca/shortcut-fe/shortcut-fe/files/usr/bin/sfe_dump b/package/kernel/qca/shortcut-fe/shortcut-fe/files/usr/bin/sfe_dump
 new file mode 100644
