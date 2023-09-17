@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.0 ipq40xx sfe openssl ea8300
+name: Build OpenWrt 23.05.0 ath79 sfe v3
 
 on:
   workflow_dispatch:
@@ -8,15 +8,15 @@ on:
 env:
   REPO_URL: https://github.com/openwrt/openwrt.git
   REPO_BRANCH: openwrt-23.05
-  REPO_BRANCH_VER: 23.05.0-rc3
-  REPO_TAG: v23.05.0-rc3
-  VERMAGIC: e5211d46c3e2a5580d2334a0236fc546
-  ARCH_PACKAGES: arm_cortex-a7_neon-vfpv4
+  REPO_BRANCH_VER: 23.05.0-rc4
+  REPO_TAG: v23.05.0-rc4
+  VERMAGIC: db5fae317c7dec03ba9a83c32ababa81
+  ARCH_PACKAGES: mips_24kc
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23050
-  CONFIG_FILE: .config_ipq40xx_sfe_openssl_ea8300
-  FILES_PATH: files_ipq40xx_sfe
-  PATCHES_PATH: patches_ipq40xx
+  CONFIG_FILE: .config_ath79_sfe_23_v3
+  FILES_PATH: files_ath79
+  PATCHES_PATH: patches_ath79_23_v3
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DIR: false
@@ -65,7 +65,7 @@ jobs:
         cd openwrt
         [ ! -d staging_dir/cache ] && mkdir -p staging_dir/cache
         TOOLCHAIN_PATH=releases/$REPO_BRANCH_VER
-        SUMS_FILE="https://downloads.cdn.openwrt.org/$TOOLCHAIN_PATH/targets/ipq40xx/generic/sha256sums"
+        SUMS_FILE="https://downloads.cdn.openwrt.org/$TOOLCHAIN_PATH/targets/ath79/generic/sha256sums"
         TOOLCHAIN_STRING="$( curl $SUMS_FILE | grep ".*openwrt-toolchain.*tar.xz")"
         TOOLCHAIN_FILE=$(echo "$TOOLCHAIN_STRING" | sed -n -e 's/.*\(openwrt-toolchain.*\).tar.xz/\1/p')
         TOOLCHAIN_SHA256=$(echo "$TOOLCHAIN_STRING" | cut -d ' ' -f 1)
@@ -88,9 +88,9 @@ jobs:
       working-directory: /workdir
       run: |
         cd openwrt/staging_dir/cache
-        [ -d ${{ env.TOOLCHAIN_FILE }}.tar.xz ] && wget -O - https://downloads.cdn.openwrt.org/${{ env.TOOLCHAIN_PATH }}/targets/ipq40xx/generic/${{ env.TOOLCHAIN_FILE }}.tar.xz \
-          | tar --xz -xf - --strip-components 1
-        wget -O - https://downloads.cdn.openwrt.org/${{ env.TOOLCHAIN_PATH }}/targets/ipq40xx/generic/llvm-bpf-15.0.7.Linux-x86_64.tar.xz \
+        wget -O - https://downloads.cdn.openwrt.org/${{ env.TOOLCHAIN_PATH }}/targets/ath79/generic/${{ env.TOOLCHAIN_FILE }}.tar.xz \
+          | tar --xz -xf -
+        wget -O - https://downloads.cdn.openwrt.org/${{ env.TOOLCHAIN_PATH }}/targets/ath79/generic/llvm-bpf-15.0.7.Linux-x86_64.tar.xz \
           | tar --xz -xf -
         chown -R $USER:$GROUPS /workdir/openwrt/staging_dir/cache
 
@@ -133,6 +133,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/else/else if (sdata->flags \&\& IEEE80211_SDATA_IN_DRIVER)/g' package/kernel/mac80211/patches/subsys/333-wifi-mac80211-add-flush_sta-method.patch
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -151,13 +152,23 @@ jobs:
           install_ccache: false
           update_packager_index: false
 
+    - name: Configure external toolchain
+      if: env.BUILD_TOOLCHAIN == 'false' && steps.parse-toolchain.outputs.toolchain-type == 'external_toolchain'
+      working-directory: /workdir
+      run: |
+        cd openwrt
+        ./scripts/ext-toolchain.sh \
+          --toolchain staging_dir/cache/${{ env.TOOLCHAIN_FILE }}/toolchain-* \
+          --overwrite-config \
+          --config ath79/generic
+
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig  V=s 2>&1 | tee defconfig.log
-        make toolchain/install
-        make download -j2  V=s 2>&1 | tee download.log
+        make defconfig V=s 2>&1 | tee defconfig.log
+        make toolchain/install V=sc
+        make download -j2 V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
     
@@ -172,15 +183,9 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo -e "Arch: $(cat ARCH_NAME)\nCPU: $(cat CPU_NAME)\nDevice: $(cat DEVICE_NAME)"
 
-    - name: Configure external toolchain
-      if: env.BUILD_TOOLCHAIN == 'false' && steps.parse-toolchain.outputs.toolchain-type == 'external_toolchain'
-      working-directory: /workdir
-      run: |
-        cd openwrt
-        
-
     - name: Compile the firmware
       id: compile
+      if: env.UPLOAD_RELEASE == 'true'
       run: |
         cd openwrt
         echo "$VERMAGIC" > ./vermagic
@@ -191,7 +196,7 @@ jobs:
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-squashfs-sysupgrade.bin ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log build_j1.log defconfig.log download.log
-        [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/${ARCH_PACKAGES}_packages.zip bin/packages/$ARCH_PACKAGES/
+        [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${ARCH_PACKAGES}_packages.zip bin/packages/$ARCH_PACKAGES/
         echo "Make Completed"
 
     - name: Prepare release
@@ -205,7 +210,7 @@ jobs:
         echo "CPU: $CPU_NAME" >> release.txt
         echo "Deivce: $DEVICE_NAME" >> release.txt
         cd openwrt/bin/targets/$ARCH_NAME/$CPU_NAME
-        [ -d packages ] && zip -r ${CPU_NAME}_packages.zip packages/
+        [ -d packages ] && zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_kmod.zip packages/
         [ -d packages ] && rm -rf packages
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
@@ -216,6 +221,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_ea8300
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_v2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
