@@ -15,7 +15,7 @@ env:
   TARGET_SUBARCH0: generic
   ARCH_PACKAGES: arm_cortex-a7_neon-vfpv4
   REPO_DEPTH: 0
-  FEEDS_CONF: feeds.conf.23050
+  FEEDS_CONF: feeds.conf.23050rc4
   CONFIG_FILE: .config_ipq40xx_sfe_openssl_multi_v4
   FILES_PATH: files_ipq40xx_sfe
   PATCHES_PATH: patches_ipq40xx_v3
