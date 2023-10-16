@@ -1,16 +1,6 @@
 CONFIG_TARGET_ath79=y
 CONFIG_TARGET_ath79_generic=y
 CONFIG_TARGET_MULTI_PROFILE=y
-CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-505=y
-CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-505=""
-CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-629-a1=y
-CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-629-a1=""
-CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-825-b1=y
-CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-825-b1=""
-CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-825-c1=y
-CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-825-c1=""
-CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-835-a1=y
-CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-835-a1=""
 CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-842-c1=y
 CONFIG_TARGET_DEVICE_PACKAGES_ath79_generic_DEVICE_dlink_dir-842-c1="-kmod-ath10k-ct -ath10k-firmware-qca9888-ct kmod-ath10k ath10k-firmware-qca9888"
 CONFIG_TARGET_DEVICE_ath79_generic_DEVICE_dlink_dir-842-c2=y
