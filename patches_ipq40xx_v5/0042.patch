@@ -1,0 +1,60 @@
+diff --git a/include/kernel-5.15 b/include/kernel-5.15
+index 12c886357958f..73639e6b1e684 100644
+--- a/include/kernel-5.15
++++ b/include/kernel-5.15
+@@ -1,2 +1,2 @@
+-LINUX_VERSION-5.15 = .142
+-LINUX_KERNEL_HASH-5.15.142 = 8d76c95277dc5ab0a6cd0069432af2ceb759d0ac2b6f5401330d390196095676
++LINUX_VERSION-5.15 = .145
++LINUX_KERNEL_HASH-5.15.145 = b2a49d87605f3a9491581150315e22337c1afb599efc1e2737481be3a2d6d620
+diff --git a/target/linux/generic/hack-5.15/940-ksmbd-have-a-dependency-on-cifs-arc4.patch b/target/linux/generic/hack-5.15/940-ksmbd-have-a-dependency-on-cifs-arc4.patch
+new file mode 100644
+index 0000000000000..4cf420a8591df
+--- /dev/null
++++ b/target/linux/generic/hack-5.15/940-ksmbd-have-a-dependency-on-cifs-arc4.patch
+@@ -0,0 +1,31 @@
++From: Namjae Jeon <linkinjeon@kernel.org>
++To: sashal@kernel.org, gregkh@linuxfoundation.org, stable@vger.kernel.org
++Cc: smfrench@gmail.com, Namjae Jeon <linkinjeon@kernel.org>
++Subject: [PATCH v2 5.15.y 1/8] ksmbd: have a dependency on cifs ARC4
++Date: Wed, 27 Dec 2023 19:25:58 +0900	[thread overview]
++Message-ID: <20231227102605.4766-2-linkinjeon@kernel.org> (raw)
++In-Reply-To: <20231227102605.4766-1-linkinjeon@kernel.org>
++
++Omitted the change that has a dependency on cifs ARC4 from backporting
++commit f9929ef6a2a5("ksmbd: add support for key exchange").
++This patch make ksmbd have a dependeny on cifs ARC4.
++
++Fixes: c5049d2d73b2 ("ksmbd: add support for key exchange")
++Signed-off-by: Namjae Jeon <linkinjeon@kernel.org>
++---
++ fs/Kconfig | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++--- a/fs/Kconfig
+++++ b/fs/Kconfig
++@@ -369,8 +369,8 @@ source "fs/ksmbd/Kconfig"
++ 
++ config SMBFS_COMMON
++ 	tristate
++-	default y if CIFS=y
++-	default m if CIFS=m
+++	default y if CIFS=y || SMB_SERVER=y
+++	default m if CIFS=m || SMB_SERVER=m
++ 
++ source "fs/coda/Kconfig"
++ source "fs/afs/Kconfig"
+diff --git a/package/kernel/linux/modules/fs.mk b/package/kernel/linux/modules/fs.mk
+index f2acaa7439845..58af180c28014 100644
+--- a/package/kernel/linux/modules/fs.mk
++++ b/package/kernel/linux/modules/fs.mk
+@@ -359,8 +359,7 @@ define KernelPackage/fs-ksmbd
+   DEPENDS:= \
+ 	  +kmod-nls-base \
+ 	  +kmod-nls-utf8 \
+-	  +kmod-crypto-md4 \
+-          +kmod-crypto-md5 \
++	  +kmod-crypto-md5 \
+ 	  +kmod-crypto-hmac \
+ 	  +kmod-crypto-ecb \
+ 	  +kmod-crypto-des \
