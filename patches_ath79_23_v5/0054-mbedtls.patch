@@ -1,0 +1,58 @@
+From b5c728948c976f0614c85aa5418af3a44424b511 Mon Sep 17 00:00:00 2001
+From: orangepizza <tjtncks@gmail.com>
+Date: Mon, 29 Jan 2024 11:37:43 +0900
+Subject: [PATCH] mbedtls: security bump to version 2.28.7
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This release of Mbed TLS provides bug fixes and minor enhancements. This
+release includes fixes for following security issues:
+
+* Timing side channel in private key RSA operations (CVE-2024-23170)
+
+  Mbed TLS is vulnerable to a timing side channel in private key RSA
+  operations. This side channel could be sufficient for an attacker to
+  recover the plaintext. A local attacker or a remote attacker who is
+  close to the victim on the network might have precise enough timing
+  measurements to exploit this. It requires the attacker to send a large
+  number of messages for decryption.
+
+* Buffer overflow in mbedtls_x509_set_extension() (CVE-2024-23775)
+
+  When writing x509 extensions we failed to validate inputs passed in to
+  mbedtls_x509_set_extension(), which could result in an integer overflow,
+  causing a zero-length buffer to be allocated to hold the extension. The
+  extension would then be copied into the buffer, causing a heap buffer
+  overflow.
+
+Fixes: CVE-2024-23170, CVE-2024-23775
+References: https://mbed-tls.readthedocs.io/en/latest/security-advisories/mbedtls-security-advisory-2024-01-1/
+References: https://mbed-tls.readthedocs.io/en/latest/security-advisories/mbedtls-security-advisory-2024-01-2/
+Signed-off-by: orangepizza <tjtncks@gmail.com>
+Signed-off-by: Petr Štetiar <ynezz@true.cz> [formal fixes]
+(cherry picked from commit 920414ca8848fe1b430e436207b4f8c927819368)
+---
+ package/libs/mbedtls/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/package/libs/mbedtls/Makefile b/package/libs/mbedtls/Makefile
+index 246b21a8531a1..ad13bbe846371 100644
+--- a/package/libs/mbedtls/Makefile
++++ b/package/libs/mbedtls/Makefile
+@@ -8,13 +8,13 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=mbedtls
+-PKG_VERSION:=2.28.5
++PKG_VERSION:=2.28.7
+ PKG_RELEASE:=2
+ PKG_BUILD_FLAGS:=no-mips16 gc-sections no-lto
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://codeload.github.com/ARMmbed/mbedtls/tar.gz/v$(PKG_VERSION)?
+-PKG_HASH:=849e86b626e42ded6bf67197b64aa771daa54e2a7e2868dc67e1e4711959e5e3
++PKG_HASH:=1df6073f0cf6a4e1953890bf5e0de2a8c7e6be50d6d6c69fa9fefcb1d14e981a
+ 
+ PKG_LICENSE:=GPL-2.0-or-later
+ PKG_LICENSE_FILES:=gpl-2.0.txt

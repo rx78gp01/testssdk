@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.2 ipq40xx sfe openssl multi
+name: Build OpenWrt 23.05.3 ipq40xx sfe openssl multi
 
 on:
   workflow_dispatch:
@@ -8,22 +8,22 @@ on:
 env:
   REPO_URL: https://github.com/openwrt/openwrt.git
   REPO_BRANCH: openwrt-23.05
-  REPO_BRANCH_VER: 23.05.2
-  REPO_TAG: v23.05.2
-  VERMAGIC: b5ab1d6f6247c989eccb311be6c450fd
+  REPO_BRANCH_VER: 23.05.3
+  REPO_TAG: v23.05.3
+  VERMAGIC: 39caa2a31a1045bb638bfa53831e47a9
   TARGET_ARCH0: ipq40xx
   TARGET_SUBARCH0: generic
   ARCH_PACKAGES: arm_cortex-a7_neon-vfpv4
   REPO_DEPTH: 0
-  FEEDS_CONF: feeds.conf.23052
-  CONFIG_FILE: .config_ipq40xx_sfe_openssl_multi_23052
+  FEEDS_CONF: feeds.conf.23053
+  CONFIG_FILE: .config_ipq40xx_sfe_openssl_multi_23053
   FILES_PATH: files_ipq40xx_sfe
-  PATCHES_PATH: patches_ipq40xx_v5
+  PATCHES_PATH: patches_ipq40xx_v6
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DIR: false
   BUILD_TOOLCHAIN: false
-  TOOLCHAIN_BRANCH_VER: 23.05.2
+  TOOLCHAIN_BRANCH_VER: 23.05.3
 
 
 jobs:
