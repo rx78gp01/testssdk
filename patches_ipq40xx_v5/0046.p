@@ -3,7 +3,7 @@ From: Chen Minqiang <ptpt52@gmail.com>
 Date: Tue, 16 Jan 2024 17:20:04 +0800
 Subject: [PATCH] kernel: ksmbd: only v2 leases handle the directory
 
-This backport a fix for ksmbd.
+This backport a fix for ksmbd. for kernel 5.15.148 and below. 
 
 Refer: https://github.com/namjaejeon/ksmbd/issues/469
 
