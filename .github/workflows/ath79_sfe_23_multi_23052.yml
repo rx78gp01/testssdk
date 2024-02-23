@@ -205,6 +205,7 @@ jobs:
       if: env.UPLOAD_RELEASE == 'true'
       run: |
         cd openwrt
+        rm -rf target/linux/ath79/patches-5.15/910-unaligned_access_hacks.patch
         echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
