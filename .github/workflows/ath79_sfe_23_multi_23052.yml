@@ -238,6 +238,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.149
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.149_v2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
