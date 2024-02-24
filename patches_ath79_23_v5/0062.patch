@@ -1,0 +1,50 @@
+From 1ce0d59a299e475887c40445c2bf34a4f4e3ec58 Mon Sep 17 00:00:00 2001
+From: John Audia <therealgraysky@proton.me>
+Date: Sat, 2 Mar 2024 05:34:58 -0500
+Subject: [PATCH] modify patch
+
+Will squash once approved but keep separate commit to clarity in review process
+
+Signed-off-by: John Audia <therealgraysky@proton.me>
+---
+ .../650-netfilter-add-xt_FLOWOFFLOAD-target.patch         | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/target/linux/generic/hack-5.15/650-netfilter-add-xt_FLOWOFFLOAD-target.patch b/target/linux/generic/hack-5.15/650-netfilter-add-xt_FLOWOFFLOAD-target.patch
+index 75afdf148a4ed..757227d745f1d 100644
+--- a/target/linux/generic/hack-5.15/650-netfilter-add-xt_FLOWOFFLOAD-target.patch
++++ b/target/linux/generic/hack-5.15/650-netfilter-add-xt_FLOWOFFLOAD-target.patch
+@@ -36,7 +36,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+  obj-$(CONFIG_NETFILTER_XT_TARGET_LED) += xt_LED.o
+ --- /dev/null
+ +++ b/net/netfilter/xt_FLOWOFFLOAD.c
+-@@ -0,0 +1,698 @@
++@@ -0,0 +1,696 @@
+ +/*
+ + * Copyright (C) 2018-2021 Felix Fietkau <nbd@nbd.name>
+ + *
+@@ -560,8 +560,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+ +	if (!flow)
+ +		goto err_flow_alloc;
+ +
+-+	if (flow_offload_route_init(flow, &route) < 0)
+-+		goto err_flow_add;
+++	flow_offload_route_init(flow, &route);
+ +
+ +	if (tcph) {
+ +		ct->proto.tcp.seen[0].flags |= IP_CT_TCP_FLAG_BE_LIBERAL;
+@@ -581,13 +580,12 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
+ +	xt_flowoffload_check_device(table, devs[0]);
+ +	xt_flowoffload_check_device(table, devs[1]);
+ +
+-+	dst_release(route.tuple[!dir].dst);
+-+
+ +	return XT_CONTINUE;
+ +
+ +err_flow_add:
+ +	flow_offload_free(flow);
+ +err_flow_alloc:
+++	dst_release(route.tuple[dir].dst);
+ +	dst_release(route.tuple[!dir].dst);
+ +err_flow_route:
+ +	clear_bit(IPS_OFFLOAD_BIT, &ct->status);
