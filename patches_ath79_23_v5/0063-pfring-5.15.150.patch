@@ -1,9 +1,9 @@
-diff --git a/feeds/packages/libs/libpfring/patches/0004-5.15.150.patch b/feeds/packages/libs/libpfring/patches/0004-5.15.150.patch
+diff --git a/feeds/packages/libs/libpfring/patches/101-5.15.150.patch b/feeds/packages/libs/libpfring/patches/101-5.15.150.patch
 new file mode 100644
 index 0000000..a974b16
 --- /dev/null
-+++ b/feeds/packages/libs/libpfring/patches/0004-5.15.150.patch
-@@ -0,0 +1,29 @@
++++ b/feeds/packages/libs/libpfring/patches/101-5.15.150.patch
+@@ -0,0 +1,25 @@
 +diff --git a/kernel/pf_ring.c b/kernel/pf_ring.c
 +index 0ec7e4e..436ea95 100644
 +--- a/kernel/pf_ring.c
@@ -17,12 +17,8 @@ index 0000000..a974b16
 + 
 +   debug_printk(2, "ring_bind() called\n");
 + 
-+@@ -5621,10 +5621,10 @@ static int ring_bind(struct socket *sock, struct sockaddr *sa, int addr_len)
-+     return(-EINVAL);
++@@ -5621,7 +5621,7 @@ static int ring_bind(struct socket *sock, struct sockaddr *sa, int addr_len)
 +   if(sa->sa_family != PF_RING)
-+     return(-EINVAL);
-+-  if(sa->sa_data == NULL)
-++  if(sa->sa_data_min == NULL)
 +     return(-EINVAL);
 + 
 +-  memcpy(name, sa->sa_data, sizeof(sa->sa_data));
