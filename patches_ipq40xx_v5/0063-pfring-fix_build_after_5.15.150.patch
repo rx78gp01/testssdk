@@ -22,7 +22,7 @@ index 0000000..a974b16
 +     return(-EINVAL);
 + 
 +-  memcpy(name, sa->sa_data, sizeof(sa->sa_data));
-++  memcpy(name, sa->sa_data_min, sizeof(sa->sa_data_min));
+++  memcpy(name, sa->sa_data, sizeof(sa->sa_data_min));
 + 
 +   /* Add trailing zero if missing */
 +   name[sizeof(name)-1] = '\0';
