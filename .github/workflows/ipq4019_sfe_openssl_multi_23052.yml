@@ -202,6 +202,7 @@ jobs:
       id: compile
       run: |
         cd openwrt
+        rm -f target/linux/generic/backport-5.15/081-v5.17-regmap-allow-to-define-reg_update_bits-for-no-bus.patch
         echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
@@ -235,6 +236,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_multi_5.15.151
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_multi_5.15.152
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
