@@ -202,7 +202,9 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        rm -f target/linux/generic/backport-5.15/081-v5.17-regmap-allow-to-define-reg_update_bits-for-no-bus.patch
+        rm -f target/linux/generic/backport-5.15/704-15-v5.19-net-mtk_eth_soc-move-MAC_MCR-setting-to-mac_finish.patch
+        rm -f target/linux/generic/pending-5.15/735-net-mediatek-mtk_eth_soc-release-MAC_MCR_FORCE_LINK-.patch
+        rm -f target/linux/generic/pending-5.15/736-net-ethernet-mtk_eth_soc-fix-PPE-hanging-issue.patch
         echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
@@ -236,6 +238,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_multi_5.15.152
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_multi_5.15.153
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
