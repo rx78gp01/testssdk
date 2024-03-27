@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.3 ath79 sfe multi
+name: Build OpenWrt 23.05.3 ccache test
 
 on:
   workflow_dispatch:
@@ -184,9 +184,9 @@ jobs:
       id: package
       run: |
         cd openwrt
-        make -j$(nproc) defconfig V=s 2>&1 | tee defconfig.log
-        make -j$(nproc) toolchain/install V=sc
-        make -j8 download V=s 2>&1 | tee download.log
+        make defconfig V=s 2>&1 | tee defconfig.log
+        make toolchain/install V=sc
+        make download -j2 V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
     
@@ -242,6 +242,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.156
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ccache_test
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
