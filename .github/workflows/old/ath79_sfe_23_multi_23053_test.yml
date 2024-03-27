@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.3 ath79 sfe multi
+name: Build OpenWrt 23.05.3 ath79 sfe multi test
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ env:
   PATCHES_PATH: patches_ath79_23_v6
   UPLOAD_RELEASE: true
   TZ: UTC
-  CACHE_DIR: false
+  CACHE_CCACHE: true
   BUILD_TOOLCHAIN: false
   TOOLCHAIN_BRANCH_VER: 23.05.3
 
@@ -42,7 +42,7 @@ jobs:
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install build-essential ccache ecj clang flex bison fastjar file g++ gawk \
+        sudo -E apt-get -qq install build-essential ecj clang flex bison fastjar file g++ gawk \
         gettext git java-propose-classpath libncurses5-dev \
         libncursesw5-dev libssl-dev unzip wget curl \
         python3-distutils rsync subversion libattr1-dev patch \
@@ -66,6 +66,7 @@ jobs:
       working-directory: /workdir
       run: |
         cd openwrt
+        [ ! -d .ccache ] && mkdir -p .ccache && chown -R $USER:$GROUPS .ccache
         [ ! -d staging_dir/cache ] && mkdir -p staging_dir/cache
         TOOLCHAIN_PATH=releases/$TOOLCHAIN_BRANCH_VER
         SUMS_FILE="https://downloads.cdn.openwrt.org/$TOOLCHAIN_PATH/targets/${{ env.TARGET_ARCH0 }}/${{ env.TARGET_SUBARCH0 }}/sha256sums"
@@ -97,32 +98,28 @@ jobs:
           | tar --xz -xf -
         chown -R $USER:$GROUPS /workdir/openwrt/staging_dir/cache
 
-    - name: Cache OpenWrt
-      uses: rx78gp01/cache@main
-      if: env.CACHE_DIR == 'true'
+    - name: Cache OpenWrt Ccache
+      uses: actions/cache@v4
+      if: env.CACHE_CCACHE == 'true'
       env:
-        cache-name: cache-openwrt
+        cache-name: cache-openwrt-ccache
       with:
-        path: |
-          openwrt/staging_dir
-          openwrt/build_dir
-          openwrt/dl
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.REPO_BRANCH }}-${{ env.VERMAGIC }}
-#        restore-keys: |
-#          ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.VERMAGIC }}
+        path: /workdir/openwrt/.ccache
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.REPO_BRANCH }}-${{ env.TARGET_ARCH0 }}-${{ env.TARGET_SUBARCH0 }}
+        save-always: true
     
     - name: Check cache
       run: |
         [ -d openwrt/staging_dir ] && echo "Found staging_dir cache" || echo "No staging_dir cache"
-        [ -d openwrt/build_dir ] && echo "Found build_dir cache" || echo "No build_dir cache"
-        [ -d openwrt/dl ] && echo "Found dl cache" ||  echo "No dl cache"
+        [ -d openwrt/.ccache ] && echo "Found Ccache" || echo "No Ccache"
         [ -L openwrt/staging_dir/cache/llvm-bpf ] && cp -P openwrt/staging_dir/cache/llvm-bpf openwrt/llvm-bpf && \
         cp -R openwrt/staging_dir/cache/llvm-bpf-15.0.7.Linux-x86_64 openwrt
         [ -d openwrt/staging_dir/cache/${{ env.TOOLCHAIN_FILE }} ] && cp -R openwrt/staging_dir/cache/${{ env.TOOLCHAIN_FILE }}/toolchain-* openwrt/staging_dir
         ls -al openwrt
+        ls -l /workdir/openwrt/.ccache
         ls -l /workdir/openwrt
         ls -l /workdir/openwrt/staging_dir/cache
-        ls -l /workdir/openwrt/staging_dir/
+
 
     - name: Setup feeds
       run: |
@@ -151,24 +148,6 @@ jobs:
       run: |
         [ -f $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config && echo 'Custom config loaded!' || echo 'No custom config!'
 
-    - name: Setup ccache
-      uses: Chocobo1/setup-ccache-action@v1
-      with:
-          install_ccache: false
-          update_packager_index: false
-          ccache_options: |
-            cache_dir=/home/runner/.ccache
-
-    - name: Configure ccache and apply fixes
-      if: env.BUILD_TOOLCHAIN == 'false'
-      working-directory: /workdir
-      env:
-        SYSTEM_CCACHE_CONF: /home/runner/.ccache/ccache.conf
-      run: |
-        [ ! -f $SYSTEM_CCACHE_CONF ] && touch $SYSTEM_CCACHE_CONF && chown -R $USER:$GROUPS /home/runner/.ccache
-        echo compiler_type=gcc >> $SYSTEM_CCACHE_CONF
-        echo hash_dir=false >> $SYSTEM_CCACHE_CONF
-
     - name: Configure external toolchain
       if: env.BUILD_TOOLCHAIN == 'false' && steps.parse-toolchain.outputs.toolchain-type == 'external_toolchain'
       working-directory: /workdir
@@ -184,9 +163,9 @@ jobs:
       id: package
       run: |
         cd openwrt
-        make -j$(nproc) defconfig V=s 2>&1 | tee defconfig.log
-        make -j$(nproc) toolchain/install V=sc
-        make -j8 download V=s 2>&1 | tee download.log
+        make defconfig V=s 2>&1 | tee defconfig.log
+        make toolchain/install V=sc
+        make download -j2 V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
     
@@ -242,6 +221,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.156_v2
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.155_test
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
