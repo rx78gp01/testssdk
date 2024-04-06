@@ -236,6 +236,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_multi_5.15.153
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_multi_5.15.154
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
