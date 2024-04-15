@@ -156,17 +156,18 @@ jobs:
       with:
           install_ccache: false
           update_packager_index: false
+          ccache_options: |
+            cache_dir=/home/runner/.ccache
 
     - name: Configure ccache and apply fixes
       if: env.BUILD_TOOLCHAIN == 'false'
       working-directory: /workdir
       env:
-        SYSTEM_CCACHE_CONF: openwrt/staging_dir/host/etc/ccache.conf
+        SYSTEM_CCACHE_CONF: /home/runner/.ccache/ccache.conf
       run: |
-        mkdir -p openwrt/staging_dir/host/etc
-        touch $SYSTEM_CCACHE_CONF
+        [ ! -f $SYSTEM_CCACHE_CONF ] && touch $SYSTEM_CCACHE_CONF && chown -R $USER:$GROUPS /home/runner/.ccache
         echo compiler_type=gcc >> $SYSTEM_CCACHE_CONF
-        chown -R $USER:$GROUPS /workdir/openwrt/staging_dir/host/etc/
+        echo hash_dir=false >> $SYSTEM_CCACHE_CONF
 
     - name: Configure external toolchain
       if: env.BUILD_TOOLCHAIN == 'false' && steps.parse-toolchain.outputs.toolchain-type == 'external_toolchain'

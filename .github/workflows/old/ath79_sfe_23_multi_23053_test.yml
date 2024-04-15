@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.3 mt7621 openssl ksmbd vpn eip93 multi
+name: Build OpenWrt 23.05.3 ath79 sfe multi test
 
 on:
   workflow_dispatch:
@@ -10,18 +10,18 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.3
   REPO_TAG: v23.05.3
-  VERMAGIC: bee655e7f41679981b85a223f3aba35b
-  TARGET_ARCH0: ramips
-  TARGET_SUBARCH0: mt7621
-  ARCH_PACKAGES: mipsel_24kc
+  VERMAGIC: 34a8cffa541c94af8232fe9af7a1f5ba
+  TARGET_ARCH0: ath79
+  TARGET_SUBARCH0: generic
+  ARCH_PACKAGES: mips_24kc
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23053
-  CONFIG_FILE: .config_mt7621_openssl_ksmbd_vpn_multi_23053
-  FILES_PATH: files_mt7621
-  PATCHES_PATH: patches_mt7621_v6
+  CONFIG_FILE: .config_ath79_sfe_23_multi_23053
+  FILES_PATH: files_ath79
+  PATCHES_PATH: patches_ath79_23_v6
   UPLOAD_RELEASE: true
   TZ: UTC
-  CACHE_DIR: false
+  CACHE_CCACHE: true
   BUILD_TOOLCHAIN: false
   TOOLCHAIN_BRANCH_VER: 23.05.3
 
@@ -42,7 +42,7 @@ jobs:
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install build-essential ccache ecj clang flex bison fastjar file g++ gawk \
+        sudo -E apt-get -qq install build-essential ecj clang flex bison fastjar file g++ gawk \
         gettext git java-propose-classpath libncurses5-dev \
         libncursesw5-dev libssl-dev unzip wget curl \
         python3-distutils rsync subversion libattr1-dev patch \
@@ -66,6 +66,7 @@ jobs:
       working-directory: /workdir
       run: |
         cd openwrt
+        [ ! -d .ccache ] && mkdir -p .ccache && chown -R $USER:$GROUPS .ccache
         [ ! -d staging_dir/cache ] && mkdir -p staging_dir/cache
         TOOLCHAIN_PATH=releases/$TOOLCHAIN_BRANCH_VER
         SUMS_FILE="https://downloads.cdn.openwrt.org/$TOOLCHAIN_PATH/targets/${{ env.TARGET_ARCH0 }}/${{ env.TARGET_SUBARCH0 }}/sha256sums"
@@ -97,32 +98,28 @@ jobs:
           | tar --xz -xf -
         chown -R $USER:$GROUPS /workdir/openwrt/staging_dir/cache
 
-    - name: Cache OpenWrt
-      uses: rx78gp01/cache@main
-      if: env.CACHE_DIR == 'true'
+    - name: Cache OpenWrt Ccache
+      uses: actions/cache@v4
+      if: env.CACHE_CCACHE == 'true'
       env:
-        cache-name: cache-openwrt
+        cache-name: cache-openwrt-ccache
       with:
-        path: |
-          openwrt/staging_dir
-          openwrt/build_dir
-          openwrt/dl
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.REPO_BRANCH }}-${{ env.VERMAGIC }}
-#        restore-keys: |
-#          ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.VERMAGIC }}
+        path: /workdir/openwrt/.ccache
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.REPO_BRANCH }}-${{ env.TARGET_ARCH0 }}-${{ env.TARGET_SUBARCH0 }}
+        save-always: true
     
     - name: Check cache
       run: |
         [ -d openwrt/staging_dir ] && echo "Found staging_dir cache" || echo "No staging_dir cache"
-        [ -d openwrt/build_dir ] && echo "Found build_dir cache" || echo "No build_dir cache"
-        [ -d openwrt/dl ] && echo "Found dl cache" ||  echo "No dl cache"
+        [ -d openwrt/.ccache ] && echo "Found Ccache" || echo "No Ccache"
         [ -L openwrt/staging_dir/cache/llvm-bpf ] && cp -P openwrt/staging_dir/cache/llvm-bpf openwrt/llvm-bpf && \
         cp -R openwrt/staging_dir/cache/llvm-bpf-15.0.7.Linux-x86_64 openwrt
         [ -d openwrt/staging_dir/cache/${{ env.TOOLCHAIN_FILE }} ] && cp -R openwrt/staging_dir/cache/${{ env.TOOLCHAIN_FILE }}/toolchain-* openwrt/staging_dir
         ls -al openwrt
+        ls -l /workdir/openwrt/.ccache
         ls -l /workdir/openwrt
         ls -l /workdir/openwrt/staging_dir/cache
-        ls -l /workdir/openwrt/staging_dir/
+
 
     - name: Setup feeds
       run: |
@@ -135,7 +132,10 @@ jobs:
       run: |
         [ -d $PATCHES_PATH ] && mv $PATCHES_PATH openwrt/$PATCHES_PATH
         cd openwrt
+        wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
+        git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/kmod-ath10k-ct ath10k-firmware-qca9888-ct/kmod-ath10k-ct ath10k-firmware-qca9888-ct-htt/g' target/linux/ath79/image/generic.mk
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -148,24 +148,6 @@ jobs:
       run: |
         [ -f $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config && echo 'Custom config loaded!' || echo 'No custom config!'
 
-    - name: Setup ccache
-      uses: Chocobo1/setup-ccache-action@v1
-      with:
-          install_ccache: false
-          update_packager_index: false
-          ccache_options: |
-            cache_dir=/home/runner/.ccache
-
-    - name: Configure ccache and apply fixes
-      if: env.BUILD_TOOLCHAIN == 'false'
-      working-directory: /workdir
-      env:
-        SYSTEM_CCACHE_CONF: /home/runner/.ccache/ccache.conf
-      run: |
-        [ ! -f $SYSTEM_CCACHE_CONF ] && touch $SYSTEM_CCACHE_CONF && chown -R $USER:$GROUPS /home/runner/.ccache
-        echo compiler_type=gcc >> $SYSTEM_CCACHE_CONF
-        echo hash_dir=false >> $SYSTEM_CCACHE_CONF
-
     - name: Configure external toolchain
       if: env.BUILD_TOOLCHAIN == 'false' && steps.parse-toolchain.outputs.toolchain-type == 'external_toolchain'
       working-directory: /workdir
@@ -175,6 +157,7 @@ jobs:
           --toolchain staging_dir/toolchain-* \
           --overwrite-config \
           --config ${{ env.TARGET_ARCH0 }}/${{ env.TARGET_SUBARCH0 }}
+
 
     - name: Download package
       id: package
@@ -189,9 +172,9 @@ jobs:
     - name: Read config target
       run: |
         cd openwrt
-        echo "ramips" > ARCH_NAME
-        echo "mt7621" > CPU_NAME
-        echo "linksys_ea8100-v1" > DEVICE_NAME
+        echo "ath79" > ARCH_NAME
+        echo "generic" > CPU_NAME
+        echo "dlink_dir-842-c1" > DEVICE_NAME
         [ -s ARCH_NAME ] && echo "ARCH_NAME=$(cat ARCH_NAME)" >> $GITHUB_ENV
         [ -s CPU_NAME ] && echo "CPU_NAME=$(cat CPU_NAME)" >> $GITHUB_ENV
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -199,6 +182,7 @@ jobs:
 
     - name: Compile the firmware
       id: compile
+      if: env.UPLOAD_RELEASE == 'true'
       run: |
         cd openwrt
         rm -f target/linux/generic/backport-5.15/704-15-v5.19-net-mtk_eth_soc-move-MAC_MCR-setting-to-mac_finish.patch
@@ -237,6 +221,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_vpn_multi_5.15.155
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_multi_5.15.155_test
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
