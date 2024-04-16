@@ -239,6 +239,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_ksmbd_vpn_multi_5.15.155
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_openssl_ksmbd_vpn_multi_5.15.156
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
