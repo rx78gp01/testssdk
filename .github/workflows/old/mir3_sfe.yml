@@ -88,6 +88,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         git apply -R cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/else/else if (sdata->flags \&\& IEEE80211_SDATA_IN_DRIVER)/g' package/kernel/mac80211/patches/subsys/413-wifi-mac80211-add-flush_sta-method.patch
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -132,7 +133,6 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        rm -f target/linux/generic/backport-5.4/430-v6.3-ubi-Fix-failure-attaching-when-vid_hdr-offset-equals.patch
         echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
@@ -176,6 +176,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_5.4.274
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_v2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
