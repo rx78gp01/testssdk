@@ -10,7 +10,6 @@ env:
   REPO_BRANCH: openwrt-21.02
   REPO_BRANCH_VER: 21.02.7
   REPO_TAG: v21.02.7
-  NAME_TAG: 5.4.274_v2
   VERMAGIC: 0da76fec06cd5588cee86d873eb8f04b
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
@@ -89,6 +88,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         git apply -R cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/else/else if (sdata->flags \&\& IEEE80211_SDATA_IN_DRIVER)/g' package/kernel/mac80211/patches/subsys/413-wifi-mac80211-add-flush_sta-method.patch
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -108,15 +108,6 @@ jobs:
           update_packager_index: false
           ccache_options: |
             cache_dir=/home/runner/.ccache
-
-    - name: Configure ccache and apply fixes
-      working-directory: /workdir
-      env:
-        SYSTEM_CCACHE_CONF: /home/runner/.ccache/ccache.conf
-      run: |
-        [ ! -f $SYSTEM_CCACHE_CONF ] && touch $SYSTEM_CCACHE_CONF && chown -R $USER:$GROUPS /home/runner/.ccache
-        echo compiler_type=gcc >> $SYSTEM_CCACHE_CONF
-        echo hash_dir=false >> $SYSTEM_CCACHE_CONF
 
     - name: Download package
       id: package
@@ -142,7 +133,6 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        rm -f target/linux/generic/backport-5.4/430-v6.3-ubi-Fix-failure-attaching-when-vid_hdr-offset-equals.patch
         echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
@@ -151,7 +141,7 @@ jobs:
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-squashfs-sysupgrade.bin ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log build_j1.log defconfig.log download.log
-        [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$ARCH_PACKAGES/
+        [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/${ARCH_PACKAGES}_packages.zip bin/packages/$ARCH_PACKAGES/
         echo "Make Completed"
 
     - name: Build PbBoot firmware
@@ -175,7 +165,7 @@ jobs:
         echo "CPU: $CPU_NAME" >> release.txt
         echo "Deivce: $DEVICE_NAME" >> release.txt
         cd openwrt/bin/targets/$ARCH_NAME/$CPU_NAME
-        [ -d packages ] && zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip packages/
+        [ -d packages ] && zip -r ${CPU_NAME}_packages_all_kmods.zip packages/
         [ -d packages ] && rm -rf packages
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
@@ -186,6 +176,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe__${{ env.NAME_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_v2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
