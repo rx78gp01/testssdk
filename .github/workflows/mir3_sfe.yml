@@ -15,8 +15,8 @@ env:
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.21027
   CONFIG_FILE: .config_mir3_sfe
-  FILES_PATH: files_mir3
-  PATCHES_PATH: patches_mir3
+  FILES_PATH: files_mir3_sfe
+  PATCHES_PATH: patches_mir3_sfe
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DIR: false
@@ -106,12 +106,14 @@ jobs:
       with:
           install_ccache: false
           update_packager_index: false
+          ccache_options: |
+            cache_dir=/home/runner/.ccache
 
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig  V=s 2>&1 | tee defconfig.log
+        make defconfig V=s 2>&1 | tee defconfig.log
         make download -j8  V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -131,7 +133,7 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        echo "$VERMAGIC" > ./vermagic
+        echo "$VERMAGIC" > ./vermagic0
         echo -e "Available core: $(nproc)"
         COMPILE_THREADS=$(($(nproc) + 1))
         echo "Compile threads: ${COMPILE_THREADS}"
@@ -163,7 +165,7 @@ jobs:
         echo "CPU: $CPU_NAME" >> release.txt
         echo "Deivce: $DEVICE_NAME" >> release.txt
         cd openwrt/bin/targets/$ARCH_NAME/$CPU_NAME
-        [ -d packages ] && zip -r ${CPU_NAME}_packages.zip packages/
+        [ -d packages ] && zip -r ${CPU_NAME}_packages_all_kmods.zip packages/
         [ -d packages ] && rm -rf packages
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
@@ -174,6 +176,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_v2
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
