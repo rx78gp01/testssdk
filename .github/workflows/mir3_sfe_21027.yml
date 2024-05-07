@@ -10,7 +10,8 @@ env:
   REPO_BRANCH: openwrt-21.02
   REPO_BRANCH_VER: 21.02.7
   REPO_TAG: v21.02.7
-  NAME_TAG: 5.4.275
+  KERNEL_VER: 5.4.275
+  END_TAG: 
   VERMAGIC: 0da76fec06cd5588cee86d873eb8f04b
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
@@ -189,6 +190,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_${{ env.NAME_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mir3_sfe_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*

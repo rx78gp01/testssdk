@@ -10,7 +10,8 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.3
   REPO_TAG: v23.05.3
-  NAME_TAG: 5.15.158
+  KERNEL_VER: 5.15.158
+  END_TAG: test
   VERMAGIC: bee655e7f41679981b85a223f3aba35b
   TARGET_ARCH0: ramips
   TARGET_SUBARCH0: mt7621
@@ -216,7 +217,7 @@ jobs:
         make -j${COMPILE_THREADS} V=s 2>&1 > build.log || make -j1 V=s 2>&1 | tee build_j1.log
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-squashfs-sysupgrade.bin ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
-        cp build_dir/target-${ARCH_PACKAGES}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-5.15.158/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
+        cp build_dir/target-${ARCH_PACKAGES}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-*/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log build_j1.log defconfig.log download.log
         [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$ARCH_PACKAGES/
         echo "Make Completed"
@@ -243,6 +244,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_ovpn26_multi_${{ env.NAME_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_ovpn26_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
