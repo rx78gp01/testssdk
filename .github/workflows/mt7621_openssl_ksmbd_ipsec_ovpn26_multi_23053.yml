@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.3 mt7621 openssl ksmbd ovpn26 eip93 multi
+name: Build OpenWrt 23.05.3 mt7621 openssl ksmbd eip93ipsec ovpn26  multi
 
 on:
   workflow_dispatch:
@@ -11,16 +11,16 @@ env:
   REPO_BRANCH_VER: 23.05.3
   REPO_TAG: v23.05.3
   KERNEL_VER: 5.15.158
-  END_TAG: 
+  END_TAG: _strongswan_5.9.14
   VERMAGIC: bee655e7f41679981b85a223f3aba35b
   TARGET_ARCH0: ramips
   TARGET_SUBARCH0: mt7621
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23053
-  CONFIG_FILE: .config_mt7621_openssl_ksmbd_ovpn26_multi_23053
+  CONFIG_FILE: .config_mt7621_openssl_ksmbd_ipsec_ovpn26_multi_23053
   FILES_PATH: files_mt7621
-  PATCHES_PATH: patches_mt7621_v7
+  PATCHES_PATH: patches_mt7621_v8
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DIR: false
@@ -244,6 +244,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_ovpn26_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_eip93ipsec_ovpn26_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
