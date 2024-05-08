@@ -217,7 +217,7 @@ jobs:
         make -j${COMPILE_THREADS} V=s 2>&1 > build.log || make -j1 V=s 2>&1 | tee build_j1.log
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-squashfs-sysupgrade.bin ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
-        [ -f build_dir/target-${ARCH_PACKAGES}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-${ARCH_PACKAGES}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
+        [ -f build_dir/target-mipsel-openwrt-linux-musl_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-mipsel-openwrt-linux-musl_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log build_j1.log defconfig.log download.log
         [ -d bin/packages/$ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$ARCH_PACKAGES/
         echo "Make Completed"
