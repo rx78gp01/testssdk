@@ -11,7 +11,7 @@ env:
   REPO_BRANCH_VER: 23.05.3
   REPO_TAG: v23.05.3
   KERNEL_VER: 5.15.160
-  END_TAG: _v4
+  END_TAG: _test
   ARCH_NAME: ramips
   CPU_NAME: mt7621
   DEVICE_NAME: linksys_ea8100-v1
@@ -223,7 +223,7 @@ jobs:
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-${FIRMWARE_NAME} ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
         [ -f build_dir/target-mipsel-openwrt-linux-musl_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-mipsel-openwrt-linux-musl_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
-        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log
+        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log build_dir/target-mipsel-openwrt-linux-musl_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/net/ethernet/mediatek/mtk_eth_soc.*
         [ -d bin/packages/$TARGET_ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$TARGET_ARCH_PACKAGES/
         echo "Make Completed"
 
