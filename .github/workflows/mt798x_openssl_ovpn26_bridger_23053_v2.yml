@@ -11,7 +11,7 @@ env:
   REPO_BRANCH_VER: 23.05.3
   REPO_TAG: v23.05.3
   KERNEL_VER: 5.15.160
-  END_TAG: _tx_2K-rx_2K_v2
+  END_TAG: _tx_2K-rx_512_v2
   ARCH_NAME: mediatek
   CPU_NAME: filogic
   DEVICE_NAME: xiaomi_mi-router-ax3000t
