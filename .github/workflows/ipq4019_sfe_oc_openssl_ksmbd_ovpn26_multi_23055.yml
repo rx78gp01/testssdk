@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.5
   REPO_TAG: v23.05.5
-  KERNEL_VER: 5.15.186
+  KERNEL_VER: 5.15.188
   END_TAG: _896MHz
   ARCH_NAME: ipq40xx
   CPU_NAME: generic
@@ -145,7 +145,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
-        sed -i 's/set_default log_level 2/set_default log_level 2/g' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
         [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s

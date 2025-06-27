@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.5
   REPO_TAG: v23.05.5
-  KERNEL_VER: 5.15.186
+  KERNEL_VER: 5.15.188
   END_TAG: 
   ARCH_NAME: mediatek
   CPU_NAME: filogic
@@ -148,7 +148,7 @@ jobs:
         rm -f package/kernel/mt76/patches/0009-mt76-mt7603*.patch
         [ $ENABLE_WIFI == 'false' ] && echo "Disable Wifi" && rm $PATCHES_PATH/0002*.patch
         [ $PATCH_PMF == 'true' ] && echo "Patch Wifi pmf" && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
-        sed -i 's/set_default log_level 2/set_default log_level 2/g' package/network/services/hostapd/files/hostapd.sh
+        sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
         [ -d $PATCHES_PATH1 ] && for FILE in $(ls $PATCHES_PATH0 | grep .patch); do git apply --check $PATCHES_PATH0/$FILE; git apply $PATCHES_PATH0/$FILE; done
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
