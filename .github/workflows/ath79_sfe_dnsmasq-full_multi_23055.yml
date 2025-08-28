@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.189
+  KERNEL_VER: 5.15.190
   END_TAG: 
   ARCH_NAME: ath79
   CPU_NAME: generic
@@ -143,6 +143,7 @@ jobs:
         [ -f patches/${PATCHES_ZIP0}.zip ] && echo "unzip patch0" && unzip patches/${PATCHES_ZIP0}.zip -d openwrt
         [ -f patches/${PATCHES_PATH}.zip ] && echo "unzip patch" && unzip patches/${PATCHES_PATH}.zip -d openwrt
         cd openwrt
+        rm -f target/linux/generic/backport-5.15/895-v6.15-000*.patch
         wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh

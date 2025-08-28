@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.189
+  KERNEL_VER: 5.15.190
   END_TAG: 
   ARCH_NAME: mediatek
   CPU_NAME: filogic
@@ -146,6 +146,8 @@ jobs:
         [ -f patches/${PATCHES_PATH}.zip ] && echo "unzip patch" && unzip patches/${PATCHES_PATH}.zip -d openwrt
         cd openwrt
         rm -f package/kernel/mt76/patches/0009-mt76-mt7603*.patch
+        rm -f target/linux/generic/backport-5.15/895-v6.15-000*.patch
+        rm -f target/linux/mediatek/patches-5.15/821-v5.16-pinctrl-mediatek-moore-check-if-pin_desc-is-valid-be.patch
         [ $ENABLE_WIFI == 'false' ] && echo "Disable Wifi" && rm $PATCHES_PATH/0002*.patch
         [ $PATCH_PMF == 'true' ] && echo "Patch Wifi pmf" && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
         sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
