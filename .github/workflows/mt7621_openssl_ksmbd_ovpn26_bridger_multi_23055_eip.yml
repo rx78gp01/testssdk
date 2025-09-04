@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.190
+  KERNEL_VER: 5.15.191
   END_TAG: _eip
   ARCH_NAME: ramips
   CPU_NAME: mt7621
@@ -240,7 +240,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-linksys-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst kconfig buildconfig *initramfs* *factory*
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-linksys-sysupgrade-firmwares-esp_hw_offload_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst kconfig buildconfig *initramfs* *factory*
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
