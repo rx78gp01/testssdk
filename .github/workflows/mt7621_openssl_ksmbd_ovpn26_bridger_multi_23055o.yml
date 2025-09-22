@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.6 mt7621 all
+name: Build OpenWrt 23.05.6 mt7621 multi
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ env:
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23056
-  CONFIG_FILE: config/.config_mt7621_openssl_ksmbd_ovpn26_bridger_all_23056
+  CONFIG_FILE: config/.config_mt7621_openssl_ksmbd_ovpn26_bridger_multi_23056
   FILES_PATH: files_mt7621
   PATCHES_ZIP0: patches_23056
   PATCHES_PATH: patches_mt7621_23056
@@ -58,20 +58,6 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-        
-        dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
-        df -h
-        sudo apt-get remove -y '^dotnet-.*'
-        sudo apt-get remove -y azure-cli google-cloud-* google-chrome-stable firefox microsoft-edge-stable
-        sudo apt-get autoremove -y
-        sudo apt-get clean
-        sudo rm -rf /usr/local/share/chromium /opt/microsoft /opt/google /usr/lib/firefox
-        ls -l /opt/hostedtoolcache/
-        sudo rm -rf /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/go /opt/hostedtoolcache/Ruby 
-        df -h
-        cd /opt
-        find . -maxdepth 1 -mindepth 1 '!' -path ./containerd '!' -path ./actionarchivecache '!' -path ./runner '!' -path ./runner-cache -exec rm -rf '{}' ';'
-        df -h
 
     - name: Clone source code
       working-directory: /workdir
@@ -254,42 +240,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-linksys-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*linksys* openwrt-*belkin* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        *base_feeds_packages.zip -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-asus-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*asus* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-netgear-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*netgear* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-tplink-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*tplink* openwrt-*mercusys* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-xiaomi-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*xiaomi* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-dlink-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*dlink* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-cudy-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*cudy* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-iodata-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*iodata* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-elecom-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*elecom* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        zip -q openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-zyxel-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip openwrt-*zyxel* \
-        sha256sums config.buildinfo feeds.buildinfo openwrt-23.05.6-ramips-mt7621.manifest profiles.json version.buildinfo *packages_all_kmods.zip \
-        -x *-initramfs* *-factory* *-kernel* *-rootfs* *-recovery* *-squashfs-firmware*
-        rm -f openwrt-*-initramfs*
-        rm -f openwrt-*-factory*
-        rm -f openwrt-*-kernel*
-        rm -f openwrt-*-rootfs*
-        rm -f openwrt-*-recovery*
-        rm -f openwrt-*-squashfs-firmware*
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-linksys-sysupgrade-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst kconfig buildconfig *initramfs* *factory*
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
@@ -299,6 +250,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_ovpn26_bridger_all_${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt7621_openssl_ksmbd_ovpn26_bridger_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
