@@ -146,8 +146,8 @@ jobs:
         rm -f target/linux/generic/backport-5.15/895-v6.15-000*.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
         sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
-        [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
-        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
+        [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
+        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
     - name: Load custom files

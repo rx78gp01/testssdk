@@ -91,7 +91,7 @@ jobs:
         wget https://github.com/openwrt/openwrt/commit/cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         git apply -R cbe73ea33d027dbb4b2cf1eca947ae746119e7d2.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
-        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep .patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
+        [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
     - name: Load custom files
