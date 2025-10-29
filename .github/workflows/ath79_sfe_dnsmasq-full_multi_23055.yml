@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.6 ath79 multi
+name: Build OpenWrt 23.05.6 ath79 ath10k-ct multi
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.195
+  KERNEL_VER: 5.15.196
   END_TAG: 
   ARCH_NAME: ath79
   CPU_NAME: generic
@@ -244,7 +244,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-ath10k-ct-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
@@ -254,6 +254,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_ath10k-ct_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*

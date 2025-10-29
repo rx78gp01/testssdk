@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.6 mt798x ubootmod recovery
+name: Build OpenWrt 23.05.6 ath79 ath10k-non-ct multi
 
 on:
   workflow_dispatch:
@@ -12,25 +12,25 @@ env:
   REPO_TAG: v23.05.6
   KERNEL_VER: 5.15.196
   END_TAG: 
-  ARCH_NAME: mediatek
-  CPU_NAME: filogic
-  DEVICE_NAME: xiaomi_mi-router-ax3000t-ubootmod
-  FIRMWARE_NAME: squashfs-sysupgrade.itb
+  ARCH_NAME: ath79
+  CPU_NAME: generic
+  DEVICE_NAME: dlink_dir-842-c1
+  FIRMWARE_NAME: squashfs-sysupgrade.bin
   LLVM_NAME: llvm-bpf-15.0.7.Linux-x86_64
-  ARCH_PACKAGES: aarch64_cortex-a53
+  ARCH_PACKAGES: mips_24kc
   REPO_DEPTH: 0
-  FEEDS_CONF: feeds.conf.23056s
-  CONFIG_FILE: config/.config_mt798x_recovery_23056
-  FILES_PATH: files_mt798x
+  FEEDS_CONF: feeds.conf.23056
+  CONFIG_FILE: config/.config_ath79_sfe_dnsmasq_multi_23056_ath10k
+  FILES_PATH: files_ath79
   PATCHES_ZIP0: patches_23056
-  PATCHES_PATH1: none
-  PATCHES_PATH: patches_mt798x_recovery
+  PATCHES_PATH: patches_ath79_23056
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DL: false
   BUILD_TOOLCHAIN: false
-  PATCH_PMF : false
+  PATCH_PMF : true
   TOOLCHAIN_BRANCH_VER: 23.05.6
+
 
 jobs:
   build:
@@ -63,7 +63,7 @@ jobs:
       working-directory: /workdir
       run: |
         [ $REPO_DEPTH -ge 1 ] && git clone --depth $REPO_DEPTH --branch $REPO_TAG --single-branch $REPO_URL openwrt
-        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_BRANCH --single-branch $REPO_URL openwrt
+        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_TAG --single-branch $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Parse toolchain file
@@ -140,15 +140,16 @@ jobs:
 
     - name: Apply patches
       run: |
-        [ -d $PATCHES_PATH1 ] && mv $PATCHES_PATH0 openwrt/$PATCHES_PATH0
+        [ -f patches/${PATCHES_ZIP0}.zip ] && echo "unzip patch0" && unzip patches/${PATCHES_ZIP0}.zip -d openwrt
         [ -f patches/${PATCHES_PATH}.zip ] && echo "unzip patch" && unzip patches/${PATCHES_PATH}.zip -d openwrt
         cd openwrt
-        rm -f package/kernel/mt76/patches/0009-mt76-mt7603*.patch
         rm -f target/linux/generic/backport-5.15/895-v6.15-000*.patch
-        rm -f target/linux/mediatek/patches-5.15/821-v5.16-pinctrl-mediatek-moore-check-if-pin_desc-is-valid-be.patch
+        wget https://github.com/openwrt/openwrt/commit/75e78bcaab847557ce1782eb2dea9dff9a029171.patch
+        git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
         sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
-        [ -d $PATCHES_PATH1 ] && for FILE in $(ls $PATCHES_PATH0 | grep \.patch); do git apply --check $PATCHES_PATH0/$FILE; git apply $PATCHES_PATH0/$FILE; done
+        sed -i 's/kmod-ath10k-ct ath10k-firmware-qca9888-ct/kmod-ath10k-smallbuffers ath10k-firmware-qca9888/g' target/linux/ath79/image/generic.mk
+        [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
 
@@ -200,7 +201,7 @@ jobs:
         make -j16 download V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-    
+
     - name: Config target
       run: |
         cd openwrt
@@ -212,6 +213,7 @@ jobs:
 
     - name: Compile the firmware
       id: compile
+      if: env.UPLOAD_RELEASE == 'true'
       run: |
         cd openwrt
         echo "TARGET NAME: $TARGET_NAME"
@@ -223,9 +225,9 @@ jobs:
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-${FIRMWARE_NAME} ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
         [ -f build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
-        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/net/ethernet/mediatek/* build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/mtd/nand/spi/* -x *.o *.ko *.cmd *.bin 
+        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log
         [ -d bin/packages/$TARGET_ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$TARGET_ARCH_PACKAGES/
-        echo "Make Completed"
+        echo "Make Completed" && echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Prepare release
       if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
@@ -242,7 +244,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-ath10k-non-ct_firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
@@ -252,6 +254,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_mt798x_ubootmod_recovery_with_mtd-rw-${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_ath10k-non-ct_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
