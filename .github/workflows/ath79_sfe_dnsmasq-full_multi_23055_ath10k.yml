@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.6 ath79 ath10k-ct multi
+name: Build OpenWrt 23.05.6 ath79 ath10k-non-ct multi
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ env:
   ARCH_PACKAGES: mips_24kc
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23056
-  CONFIG_FILE: config/.config_ath79_sfe_dnsmasq_multi_23056
+  CONFIG_FILE: config/.config_ath79_sfe_dnsmasq_multi_23056_ath10k
   FILES_PATH: files_ath79
   PATCHES_ZIP0: patches_23056
   PATCHES_PATH: patches_ath79_23056
@@ -148,7 +148,7 @@ jobs:
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
         sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
-        sed -i 's/kmod-ath10k-ct ath10k-firmware-qca9888-ct/kmod-ath10k-ct-smallbuffers ath10k-firmware-qca9888-ct-htt/g' target/linux/ath79/image/generic.mk
+        sed -i 's/kmod-ath10k-ct ath10k-firmware-qca9888-ct/kmod-ath10k-smallbuffers ath10k-firmware-qca9888/g' target/linux/ath79/image/generic.mk
         [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
@@ -244,7 +244,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-ath10k-ct-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-ath10k-non-ct_firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
@@ -254,6 +254,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_ath10k-ct_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_ath10k-non-ct_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*

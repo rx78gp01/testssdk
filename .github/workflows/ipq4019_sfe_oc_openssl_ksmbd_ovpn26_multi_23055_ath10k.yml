@@ -1,6 +1,6 @@
 # Build OpenWrt using GitHub Actions
 
-name: Build OpenWrt 23.05.6 ath79 ath10k-ct multi
+name: Build OpenWrt 23.05.6 ipq40xx oc ath10k-non-ct multi
 
 on:
   workflow_dispatch:
@@ -11,26 +11,25 @@ env:
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
   KERNEL_VER: 5.15.196
-  END_TAG: 
-  ARCH_NAME: ath79
+  END_TAG: _896MHz
+  ARCH_NAME: ipq40xx
   CPU_NAME: generic
-  DEVICE_NAME: dlink_dir-842-c1
+  DEVICE_NAME: linksys_ea8300
   FIRMWARE_NAME: squashfs-sysupgrade.bin
   LLVM_NAME: llvm-bpf-15.0.7.Linux-x86_64
-  ARCH_PACKAGES: mips_24kc
+  ARCH_PACKAGES: arm_cortex-a7_neon-vfpv4
   REPO_DEPTH: 0
   FEEDS_CONF: feeds.conf.23056
-  CONFIG_FILE: config/.config_ath79_sfe_dnsmasq_multi_23056
-  FILES_PATH: files_ath79
+  CONFIG_FILE: config/.config_ipq40xx_sfe_openssl_ksmbd_ovpn26_multi_23056
+  FILES_PATH: files_ipq40xx_sfe
   PATCHES_ZIP0: patches_23056
-  PATCHES_PATH: patches_ath79_23056
+  PATCHES_PATH: patches_ipq40xx_23056_oc
   UPLOAD_RELEASE: true
   TZ: UTC
   CACHE_DL: false
   BUILD_TOOLCHAIN: false
   PATCH_PMF : true
   TOOLCHAIN_BRANCH_VER: 23.05.6
-
 
 jobs:
   build:
@@ -148,7 +147,8 @@ jobs:
         git apply -R 75e78bcaab847557ce1782eb2dea9dff9a029171.patch
         [ $PATCH_PMF == 'true' ] && sed -i 's|\(.*\)gt 0\(.*\)"WPA-PSK-SHA256"|\1gt 1\2"WPA-PSK-SHA256"|' package/network/services/hostapd/files/hostapd.sh
         sed -i 's/reassociation_deadline 1000/reassociation_deadline 20000/g' package/network/services/hostapd/files/hostapd.sh
-        sed -i 's/kmod-ath10k-ct ath10k-firmware-qca9888-ct/kmod-ath10k-ct-smallbuffers ath10k-firmware-qca9888-ct-htt/g' target/linux/ath79/image/generic.mk
+        sed -i 's/-ct//g' target/linux/ipq40xx/image/generic.mk
+        sed -i 's/-ct//g' target/linux/ipq40xx/Makefile
         [ -d $PATCHES_ZIP0 ] && for FILE in $(ls $PATCHES_ZIP0 | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_ZIP0/$FILE; git apply $PATCHES_ZIP0/$FILE; done
         [ -d $PATCHES_PATH ] && for FILE in $(ls $PATCHES_PATH | grep \.patch); do GIT_TRACE=true git apply --check $PATCHES_PATH/$FILE; git apply $PATCHES_PATH/$FILE; done
         git status -s
@@ -201,7 +201,7 @@ jobs:
         make -j16 download V=s 2>&1 | tee download.log
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-
+    
     - name: Config target
       run: |
         cd openwrt
@@ -213,7 +213,6 @@ jobs:
 
     - name: Compile the firmware
       id: compile
-      if: env.UPLOAD_RELEASE == 'true'
       run: |
         cd openwrt
         echo "TARGET NAME: $TARGET_NAME"
@@ -227,7 +226,7 @@ jobs:
         [ -f build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log
         [ -d bin/packages/$TARGET_ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$TARGET_ARCH_PACKAGES/
-        echo "Make Completed" && echo "status=success" >> $GITHUB_OUTPUT
+        echo "Make Completed"
 
     - name: Prepare release
       if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
@@ -244,7 +243,7 @@ jobs:
         [ -d packages ] && rm -rf packages
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-packages_all_kmods.zip >> sha256sums
         sha256sum -b openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip >> sha256sums
-        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-ath10k-ct-firmwares_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst
+        zip -r openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-sysupgrade_ath10k-non-ct-firmwares_896MHz_$(date +"%Y-%m-%d_%H-%M").zip . -x log.zip \*.zst kconfig buildconfig *initramfs* *factory*
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
         echo "TAG_DATE=$(date +"%Y-%m-%d_%H_%M")" >> $GITHUB_ENV
 
@@ -254,6 +253,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ath79_sfe_ath10k-ct_dnsmasq-full_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
+        tag_name: openwrt-${{ env.REPO_BRANCH_VER }}_ipq40xx_sfe_oc_openssl_ksmbd_ovpn26_ath10k-non-ct_multi_${{ env.KERNEL_VER }}${{ env.END_TAG }}
         body_path: release.txt
         files: ${{ env.FIRMWARE_PATH }}/*
