@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.198
+  KERNEL_VER: 5.15.206
   END_TAG: 
   ARCH_NAME: ramips
   CPU_NAME: mt7621
@@ -19,7 +19,7 @@ env:
   LLVM_NAME: llvm-bpf-15.0.7.Linux-x86_64
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
-  FEEDS_CONF: feeds.conf.23056
+  FEEDS_CONF: feeds.conf.23056s
   CONFIG_FILE: config/.config_mt7621_openssl_ksmbd_ovpn26_bridger_all_23056
   FILES_PATH: files_mt7621
   PATCHES_ZIP0: patches_23056
@@ -77,7 +77,7 @@ jobs:
       working-directory: /workdir
       run: |
         [ $REPO_DEPTH -ge 1 ] && git clone --depth $REPO_DEPTH --branch $REPO_TAG --single-branch $REPO_URL openwrt
-        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_BRANCH --single-branch $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Parse toolchain file
@@ -238,7 +238,7 @@ jobs:
         zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/net/ethernet/mediatek/* \
         build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/mt76* -x *.o *.ko *.cmd *.bin
         [ -d bin/packages/$TARGET_ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$TARGET_ARCH_PACKAGES/
-        echo "Make Completed"
+        echo "Make Completed" && echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Prepare release
       if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
