@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-23.05
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
-  KERNEL_VER: 5.15.198
+  KERNEL_VER: 5.15.206
   END_TAG: _eip
   ARCH_NAME: ramips
   CPU_NAME: mt7621
@@ -19,7 +19,7 @@ env:
   LLVM_NAME: llvm-bpf-15.0.7.Linux-x86_64
   ARCH_PACKAGES: mipsel_24kc
   REPO_DEPTH: 0
-  FEEDS_CONF: feeds.conf.23056
+  FEEDS_CONF: feeds.conf.23056s
   CONFIG_FILE: config/.config_mt7621_openssl_ksmbd_ipsec_ovpn26_multi_23056
   FILES_PATH: files_mt7621
   PATCHES_ZIP0: patches_23056
@@ -63,7 +63,7 @@ jobs:
       working-directory: /workdir
       run: |
         [ $REPO_DEPTH -ge 1 ] && git clone --depth $REPO_DEPTH --branch $REPO_TAG --single-branch $REPO_URL openwrt
-        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_TAG --single-branch $REPO_URL openwrt
+        [ $REPO_DEPTH -eq 0 ] && git clone --branch $REPO_BRANCH --single-branch $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Parse toolchain file
