@@ -21,12 +21,13 @@ CONFIG_CCACHE_DIR="/home/runner/.ccache"
 CONFIG_IMAGEOPT=y
 CONFIG_KERNEL_BUILD_DOMAIN="buildhost"
 CONFIG_KERNEL_BUILD_USER="builder"
-# CONFIG_KERNEL_KALLSYMS is not set
+CONFIG_KERNEL_KALLSYMS=y
+CONFIG_KERNEL_DEBUG_INFO_REDUCED=n
 # CONFIG_MAKE_TOOLCHAIN is not set
-CONFIG_PACKAGE_kmod-ath10k-ct-smallbuffers=m
+CONFIG_PACKAGE_kmod-ath10k-ct-smallbuffers=y
 CONFIG_PACKAGE_kmod-ath10k-ct=m
 CONFIG_PACKAGE_kmod-ath10k=m
-CONFIG_PACKAGE_kmod-ath10k-smallbuffers=y
+CONFIG_PACKAGE_kmod-ath10k-smallbuffers=m
 CONFIG_PACKAGE_cgi-io=y
 CONFIG_PACKAGE_kmod-fast-classifier=y
 CONFIG_PACKAGE_kmod-shortcut-fe=y
