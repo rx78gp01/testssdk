@@ -235,8 +235,8 @@ jobs:
         [ -f bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${DEVICE_NAME}-${FIRMWARE_NAME} ] && echo "status=success" >> $GITHUB_OUTPUT
         cp .config bin/targets/$ARCH_NAME/$CPU_NAME/buildconfig
         [ -f build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config ] && cp build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/.config bin/targets/$ARCH_NAME/$CPU_NAME/kconfig
-        zip -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/net/ethernet/mediatek/* \
-        build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/mt76* -x *.o *.ko *.cmd *.bin
+        zip -r -q bin/targets/$ARCH_NAME/$CPU_NAME/log.zip build.log defconfig.log download.log build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/linux-${KERNEL_VER}/drivers/net/ethernet/mediatek/* \
+        build_dir/target-${TARGET_NAME}_musl/linux-${ARCH_NAME}_${CPU_NAME}/mt76-* -x *.o *.ko *.cmd *.bin *.mod *.mod.c
         [ -d bin/packages/$TARGET_ARCH_PACKAGES/ ] && zip -r bin/targets/$ARCH_NAME/$CPU_NAME/openwrt-${REPO_BRANCH_VER}-${ARCH_NAME}-${CPU_NAME}-${TARGET_ARCH_PACKAGES}_base_feeds_packages.zip bin/packages/$TARGET_ARCH_PACKAGES/
         echo "Make Completed" && echo "status=success" >> $GITHUB_OUTPUT
 
