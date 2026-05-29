@@ -11,7 +11,7 @@ env:
   REPO_BRANCH_VER: 23.05.6
   REPO_TAG: v23.05.6
   KERNEL_VER: 5.15.208
-  END_TAG: _DMA
+  END_TAG: 
   ARCH_NAME: ramips
   CPU_NAME: mt7621
   DEVICE_NAME: linksys_ea8100-v1
